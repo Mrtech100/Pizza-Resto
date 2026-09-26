@@ -504,6 +504,21 @@ const FIREBASE_CONFIG = {
 
 const CHICKEN_BBQ_LARGE_PRICE = 1_200_000;
 
+/* ── Extras group ─────────────────────────────────────────────────────────
+   Always shown on the pizza options dialog. Multi-select toggle buttons,
+   every choice at 0 price. Defined once here so seed / migration / runtime
+   repair all use the exact same list. */
+const EXTRAS_GROUP_NAME = "Extras";
+const EXTRAS_CHOICES = [
+  { label:"Without Olive",    price:0 },
+  { label:"Without Pepper",   price:0 },
+  { label:"Without Mushroom", price:0 },
+  { label:"Without Sauce",    price:0 },
+];
+function freshExtrasChoices(){
+  return EXTRAS_CHOICES.map(c => ({ label:c.label, price:0 }));
+}
+
 const DEFAULT_OPTIONS = [
   { name:"Size", multi:false, choices:[
     { label:"Small",  price: 750000 },
@@ -518,12 +533,7 @@ const DEFAULT_OPTIONS = [
     { label:"Plain",       price:0 },
     { label:"Chicken BBQ", price:0 },
   ]},
-  { name:"Extras", multi:true, choices:[
-    { label:"Without Olive",    price:0 },
-    { label:"Without Pepper",   price:0 },
-    { label:"Without Mushroom", price:0 },
-    { label:"Without Sauce",    price:0 },
-  ]},
+  { name:EXTRAS_GROUP_NAME, multi:true, choices:freshExtrasChoices() },
 ];
 
 const DEFAULT_SETTINGS = {
@@ -625,6 +635,7 @@ function escapeHtml(s){
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+function cloneJson(o){ return JSON.parse(JSON.stringify(o)); }
 function fmtMoney(v, sym){
   sym = sym || (DB.settings && DB.settings.currency_symbol) || "LBP ";
   const n = Number(v) || 0;
@@ -768,6 +779,14 @@ const DB = {
     this.settings.bbq_v1 = "1";
     this.settings.extras_v1 = "1";
 
+    /* Guarantee the Extras group is baked into the seeded pizza options */
+    try{
+      const opts = JSON.parse(this.settings.product_options);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+    }catch(e){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+    }
+
     const hash = await Crypto.hash("admin123");
     this.users = [{
       id:1, username:"admin", password:hash,
@@ -792,39 +811,34 @@ const DB = {
   },
 
   _migrations(){
-    for (const k in DEFAULT_SETTINGS){
-      if (!(k in this.settings)) this.settings[k] = DEFAULT_SETTINGS[k];
-    }
+    /* ══════════════════════════════════════════════════════════════════
+       IMPORTANT ORDERING NOTE
+       Versioned migrations MUST run before the generic "back-fill missing
+       settings keys" loop. That loop copies DEFAULT_SETTINGS values (which
+       already contain options_v2 / extras_v1 / bbq_v1 = "1"), so running it
+       first silently marked every migration as "already applied" and the
+       Extras group (Without Olive / Pepper / Mushroom / Sauce) was never
+       written into product_options — that is why it never showed up.
+       ══════════════════════════════════════════════════════════════════ */
+
+    /* ── 1. options_v2 ── */
     if (this.settings.options_v2 !== "1"){
       this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
       this.settings.options_v2 = "1";
     }
-    // Extras group added (Without Olive/Pepper/Mushroom/Sauce)
+
+    /* ── 2. Extras group migration (multi-select toggles, 0 price) ── */
     if (this.settings.extras_v1 !== "1"){
-      let opts;
-      try{ opts = JSON.parse(this.settings.product_options); }
-      catch(e){ opts = JSON.parse(JSON.stringify(DEFAULT_OPTIONS)); }
-      if (!Array.isArray(opts)) opts = [];
-      const extras = DEFAULT_OPTIONS.find(g=>g.name === "Extras");
-      let found = false;
-      for (const g of opts){
-        if (g.name === "Extras"){ g.multi = true; g.choices = extras.choices;
-          g.large_only = false; found = true; break; }
+      let opts = null;
+      try{ opts = JSON.parse(this.settings.product_options); }catch(e){ opts = null; }
+      if (!Array.isArray(opts) || !opts.length){
+        opts = cloneJson(DEFAULT_OPTIONS);
       }
-      if (!found) opts.push(JSON.parse(JSON.stringify(extras)));
-      this.settings.product_options = JSON.stringify(opts);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
       this.settings.extras_v1 = "1";
     }
-    // Attach custom options to non-pizza items (idempotent)
-    for (const p of this.products){
-      const c = CUSTOM_OPTIONS[p.name];
-      if (c && !p.custom_options){
-        p.custom_options = JSON.stringify(c);
-        p.has_options = 1;
-        p.price = 0;
-      }
-    }
-    // Ensure Chicken BBQ Pizza is fixed price 1,200,000
+
+    /* ── 3. Chicken BBQ Pizza fixed price ── */
     if (this.settings.bbq_v1 !== "1"){
       const bbq = this.products.find(x=>x.name === "Chicken BBQ Pizza");
       if (bbq){
@@ -835,6 +849,31 @@ const DB = {
       }
       this.settings.bbq_v1 = "1";
     }
+
+    /* ── 4. Back-fill any still-missing settings keys ── */
+    for (const k in DEFAULT_SETTINGS){
+      if (!(k in this.settings)) this.settings[k] = DEFAULT_SETTINGS[k];
+    }
+
+    /* ── 5. Belt & braces: always guarantee the Extras group exists ── */
+    try{
+      const opts = JSON.parse(this.settings.product_options);
+      const res = ensureExtrasGroup(opts);
+      if (res.changed) this.settings.product_options = JSON.stringify(res.groups);
+    }catch(e){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+    }
+
+    /* ── 6. Attach custom options to non-pizza items (idempotent) ── */
+    for (const p of this.products){
+      const c = CUSTOM_OPTIONS[p.name];
+      if (c && !p.custom_options){
+        p.custom_options = JSON.stringify(c);
+        p.has_options = 1;
+        p.price = 0;
+      }
+    }
+
     this.save("settings"); this.save("products");
   },
 
@@ -1093,6 +1132,43 @@ const DB = {
 };
 
 /* ─────────────────────────── OPTION PRICING ─────────────────────────── */
+
+/* Ensures an "Extras" group with the four toggle choices exists inside a
+   parsed option-group array. Idempotent — safe to call on every read.
+   Returns { groups, changed }. */
+function ensureExtrasGroup(groups){
+  let changed = false;
+  if (!Array.isArray(groups)){ groups = []; changed = true; }
+
+  let grp = null;
+  for (const g of groups){
+    if (g && g.name === EXTRAS_GROUP_NAME){ grp = g; break; }
+  }
+  if (!grp){
+    grp = { name:EXTRAS_GROUP_NAME, multi:true, choices:[] };
+    groups.push(grp);
+    changed = true;
+  }
+
+  /* Always a multi-select toggle group, never hidden by size */
+  if (grp.multi !== true){ grp.multi = true; changed = true; }
+  if (grp.large_only){ grp.large_only = false; changed = true; }
+  if (!Array.isArray(grp.choices)){ grp.choices = []; changed = true; }
+
+  /* Every "Without ..." choice present, always at 0 price */
+  for (const c of EXTRAS_CHOICES){
+    const ex = grp.choices.find(x => x && x.label === c.label);
+    if (!ex){
+      grp.choices.push({ label:c.label, price:0 });
+      changed = true;
+    } else if (Number(ex.price) !== 0){
+      ex.price = 0;
+      changed = true;
+    }
+  }
+  return { groups, changed };
+}
+
 function computeUnitPrice(product, chosenOptions){
   let total = Number(product.price) || 0;
   for (const o of chosenOptions) total += Number(o.price) || 0;
@@ -1105,14 +1181,27 @@ function computeUnitPrice(product, chosenOptions){
   return total;
 }
 function optionsFor(product){
-  if (product.custom_options){
+  /* 1) Product-specific option groups (Fries, Wings, Soft Drink, …) */
+  if (product && product.custom_options){
     try{
       const parsed = JSON.parse(product.custom_options);
       if (Array.isArray(parsed) && parsed.length) return parsed;
     }catch(e){}
   }
-  try{ return JSON.parse(DB.settings.product_options); }
-  catch(e){ return JSON.parse(JSON.stringify(DEFAULT_OPTIONS)); }
+  /* 2) Global pizza option groups — always repaired to include Extras */
+  let groups = null;
+  try{ groups = JSON.parse(DB.settings.product_options); }catch(e){ groups = null; }
+  if (!Array.isArray(groups) || !groups.length){
+    groups = cloneJson(DEFAULT_OPTIONS);
+  }
+  const res = ensureExtrasGroup(groups);
+  if (res.changed){
+    try{
+      DB.settings.product_options = JSON.stringify(res.groups);
+      DB.save("settings");
+    }catch(e){}
+  }
+  return res.groups;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
@@ -1330,14 +1419,21 @@ const POSPage = {
       </div><div class="m-body">`;
 
       for (const grp of groups){
-        const isSize   = grp.name === "Size";
-        const isFlavor = grp.name === "Flavor";
+        const isSize    = grp.name === "Size";
+        const isFlavor  = grp.name === "Flavor";
+        const isExtras  = grp.name === EXTRAS_GROUP_NAME;
         const largeOnly = !!grp.large_only;
-        const isLarge = state.size === "Large";
-        const show = !largeOnly || isLarge;
-        const hint = grp.multi && grp.max_choices
-          ? ` <span class="faint">(choose ${grp.max_choices})</span>`
-          : grp.multi ? " <span class='faint'>(multiple)</span>" : "";
+        const isLarge   = state.size === "Large";
+
+        /* ── Extras are ALWAYS visible — never hidden by size / flavor ── */
+        const show = isExtras || !largeOnly || isLarge;
+
+        const hint = isExtras
+          ? ` <span class="faint">(optional · tap to toggle)</span>`
+          : (grp.multi && grp.max_choices)
+            ? ` <span class="faint">(choose ${grp.max_choices})</span>`
+            : grp.multi ? " <span class='faint'>(multiple)</span>" : "";
+
         html += `<div class="opt-group" style="display:${show?"block":"none"};">
           <h3>${escapeHtml(grp.name)}${hint}</h3>
           <div class="opt-chips">`;
@@ -1347,7 +1443,7 @@ const POSPage = {
           else if (isFlavor) on = state.flavorSet.has(ch.label);
           else on = !!(state.groups[grp.name] && state.groups[grp.name][ch.label]);
           let priceStr = "";
-          if (ch.price){
+          if (Number(ch.price)){
             const sign = ch.price > 0 ? "+" : "−";
             priceStr = `  ${sign}${fmtMoney(Math.abs(ch.price), sym)}`;
           }
@@ -1402,7 +1498,7 @@ const POSPage = {
           } else {
             const grp = groups.find(x=>x.name === g);
             state.groups[g] = state.groups[g] || {};
-            if (!grp.multi) state.groups[g] = { [l]: true };
+            if (grp && !grp.multi) state.groups[g] = { [l]: true };
             else state.groups[g][l] = !state.groups[g][l];
           }
           /* Preserve focus on note area if it was active */
