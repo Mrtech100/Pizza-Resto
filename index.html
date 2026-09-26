@@ -72,7 +72,7 @@ input,select,textarea{
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
   background-repeat:no-repeat; background-position:right 10px center; padding-right:28px;}
 input:focus,select:focus,textarea:focus{border-color:var(--primary);}
-textarea{resize:vertical; font-family:ui-monospace,monospace;}
+textarea{resize:vertical; font-family:inherit;}
 
 .card{background:var(--surface); border:1px solid var(--border);
   border-radius:16px; box-shadow:var(--shadow);}
@@ -176,25 +176,30 @@ tbody tr:hover td{background:var(--surface2);}
   border-top:1px solid var(--border); border-bottom:1px solid var(--border);
   padding:6px 0; -webkit-overflow-scrolling:touch;}
 .cart-empty{color:var(--text3); text-align:center; padding:30px 10px; font-size:12px;}
-.cart-line{display:flex; align-items:center; gap:8px; padding:6px 0;
+.cart-line{display:flex; align-items:flex-start; gap:8px; padding:8px 0;
   border-bottom:1px solid var(--border);}
 .cart-line:last-child{border-bottom:none;}
 .cart-line .info{flex:1; min-width:0;}
 .cart-line .nm{font-weight:600; font-size:12px;}
 .cart-line .opts{color:var(--text3); font-size:10px; word-break:break-word;}
-.cart-line .unit{color:var(--text3); font-size:9px;}
-.cart-line .qty-ctrl{display:flex; align-items:center; gap:2px; flex-shrink:0;}
+.cart-line .note{color:var(--warn); font-size:10px; word-break:break-word;
+  font-style:italic; margin-top:2px;}
+.cart-line .unit{color:var(--text3); font-size:9px; margin-top:2px;}
+.cart-line .qty-ctrl{display:flex; align-items:center; gap:2px; flex-shrink:0;
+  margin-top:2px;}
 .cart-line .qty-ctrl button{
   background:var(--surface2); border:1px solid var(--border);
   border-radius:8px; width:26px; height:26px; padding:0;
   display:flex; align-items:center; justify-content:center; font-size:14px;
 }
 .cart-line .qty-ctrl .q{min-width:22px; text-align:center; font-weight:700; font-size:12px;}
-.cart-line .total{min-width:88px; text-align:right; font-weight:700; font-size:11px; flex-shrink:0;}
+.cart-line .total{min-width:88px; text-align:right; font-weight:700; font-size:11px;
+  flex-shrink:0; margin-top:2px;}
 .cart-line .total .usd{color:var(--text3); font-size:9px; font-weight:400;}
 
 .totals{padding:6px 0; font-size:12px;}
-.totals .row{display:flex; justify-content:space-between; padding:3px 0; align-items:center; gap:8px;}
+.totals .row{display:flex; justify-content:space-between; padding:3px 0;
+  align-items:center; gap:8px;}
 .totals .row.disc input{width:110px; padding:5px 6px; font-size:11px; text-align:right;}
 .totals .grand{font-size:15px; font-weight:800; padding-top:6px;}
 .pos-actions{display:flex; gap:6px; flex-shrink:0;}
@@ -299,7 +304,7 @@ tbody tr:hover td{background:var(--surface2);}
 .form-row.checkbox label{display:flex; align-items:center; gap:8px; cursor:pointer;}
 .form-row.checkbox input[type=checkbox]{width:auto;}
 
-/* ══════════════════════ CART FAB + MOBILE HOSTS ══════════════════════ */
+/* ══════════════════════ CART FAB + MOBILE ══════════════════════ */
 .cart-fab{
   position:fixed;
   bottom:calc(72px + env(safe-area-inset-bottom, 0px));
@@ -319,7 +324,6 @@ tbody tr:hover td{background:var(--surface2);}
 }
 body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 .cart-fab.hidden{display:none !important;}
-
 .cart-close{display:none;}
 
 /* ══════════════════════ PRINT ══════════════════════ */
@@ -514,6 +518,12 @@ const DEFAULT_OPTIONS = [
     { label:"Plain",       price:0 },
     { label:"Chicken BBQ", price:0 },
   ]},
+  { name:"Extras", multi:true, choices:[
+    { label:"Without Olive",    price:0 },
+    { label:"Without Pepper",   price:0 },
+    { label:"Without Mushroom", price:0 },
+    { label:"Without Sauce",    price:0 },
+  ]},
 ];
 
 const DEFAULT_SETTINGS = {
@@ -537,6 +547,7 @@ const DEFAULT_SETTINGS = {
   firebase_collection_cash:"close_cash",
   options_v2:      "1",
   bbq_v1:          "1",
+  extras_v1:       "1",
 };
 
 const SEED_CATEGORIES = ["Pizza","Sides","Chicken","Drinks"];
@@ -548,7 +559,7 @@ const SEED_PRODUCTS = [
   ["Vegetarian Pizza","🥬","Pizza",0,0,0,0,1],
   ["Margherita Pizza","🍕","Pizza",0,0,0,0,1],
   ["Plain Pizza","🍕","Pizza",0,0,0,0,1],
-  ["Chicken BBQ Pizza","🍕","Pizza",1200000,0,0,0,0],   // ← fixed 1,200,000
+  ["Chicken BBQ Pizza","🍕","Pizza",1200000,0,0,0,0],
   ["Cheese Garlic Fingers","🧄","Sides",0,180000,50,1,1],
   ["Fries","🍟","Sides",0,100000,60,1,1],
   ["Chicken Wings","🍗","Chicken",0,0,0,0,1],
@@ -755,6 +766,7 @@ const DB = {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, this.settings);
     this.settings.options_v2 = "1";
     this.settings.bbq_v1 = "1";
+    this.settings.extras_v1 = "1";
 
     const hash = await Crypto.hash("admin123");
     this.users = [{
@@ -786,6 +798,22 @@ const DB = {
     if (this.settings.options_v2 !== "1"){
       this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
       this.settings.options_v2 = "1";
+    }
+    // Extras group added (Without Olive/Pepper/Mushroom/Sauce)
+    if (this.settings.extras_v1 !== "1"){
+      let opts;
+      try{ opts = JSON.parse(this.settings.product_options); }
+      catch(e){ opts = JSON.parse(JSON.stringify(DEFAULT_OPTIONS)); }
+      if (!Array.isArray(opts)) opts = [];
+      const extras = DEFAULT_OPTIONS.find(g=>g.name === "Extras");
+      let found = false;
+      for (const g of opts){
+        if (g.name === "Extras"){ g.multi = true; g.choices = extras.choices;
+          g.large_only = false; found = true; break; }
+      }
+      if (!found) opts.push(JSON.parse(JSON.stringify(extras)));
+      this.settings.product_options = JSON.stringify(opts);
+      this.settings.extras_v1 = "1";
     }
     // Attach custom options to non-pizza items (idempotent)
     for (const p of this.products){
@@ -892,6 +920,7 @@ const DB = {
         Object.assign(row, {
           order_type:o.type, status,
           customer_id:o.customer_id, customer_name:o.customer_name||"",
+          customer_phone:o.customer_phone||"",
           subtotal:o.subtotal, discount:o.discount, tax:o.tax,
           delivery:o.delivery, total:o.total,
           payment_method:o.payment_method||"Cash",
@@ -904,6 +933,7 @@ const DB = {
       this.orders.push({
         id:oid, order_no:o.no, order_type:o.type||"Delivery", status,
         customer_id:o.customer_id||null, customer_name:o.customer_name||"",
+        customer_phone:o.customer_phone||"",
         subtotal:o.subtotal, discount:o.discount, tax:o.tax,
         delivery:o.delivery, total:o.total,
         payment_method:o.payment_method||"Cash",
@@ -918,6 +948,7 @@ const DB = {
         order_id: oid, product_id: it.product_id, name: it.name,
         qty: it.qty, unit_price: it.unit,
         options: (it.options||[]).map(x=>x.label).join(", "),
+        note: it.note||"",
         line_total: it.line,
       });
     }
@@ -1219,9 +1250,10 @@ const POSPage = {
   },
   resolveCustomer(){
     const text = document.getElementById("cust-input").value.trim();
-    if (!text) return { id:null, name:"" };
+    if (!text) return { id:null, name:"", phone:"" };
     const c = DB.customers.find(x=>x.name.toLowerCase() === text.toLowerCase());
-    return c ? { id:c.id, name:c.name } : { id:null, name:text };
+    return c ? { id:c.id, name:c.name, phone:c.phone||"" }
+             : { id:null, name:text, phone:"" };
   },
   setCustomer(id, name){
     document.getElementById("cust-input").value = name || "";
@@ -1273,21 +1305,21 @@ const POSPage = {
       toast(`${p.name} is out of stock`, "warning"); return;
     }
     if (p.has_options) this.showOptionDialog(p);
-    else this.addItemToCart(p, 1, [], Number(p.price));
+    else this.addItemToCart(p, 1, [], Number(p.price), "");
   },
 
-  addItemToCart(p, qty, options, unit){
+  addItemToCart(p, qty, options, unit, note){
     this.current_order.items.push({
       key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       product_id: p.id, name: p.name, emoji: p.emoji,
-      qty, unit, options, line: unit * qty,
+      qty, unit, options, note: note || "", line: unit * qty,
     });
     this.renderCart(); this.recalc(); this.updateCartFab();
   },
 
   showOptionDialog(p){
     const groups = optionsFor(p);
-    const state = { size:null, flavorSet:new Set(), groups:{}, qty:1 };
+    const state = { size:null, flavorSet:new Set(), groups:{}, qty:1, note:"" };
     const sym = DB.settings.currency_symbol;
 
     const rebuild = ()=>{
@@ -1325,11 +1357,20 @@ const POSPage = {
         }
         html += `</div></div>`;
       }
+
+      /* Quantity + Note */
       html += `<div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
         <span class="muted">Quantity</span>
         <input type="number" id="opt-qty" min="1" max="99" value="${state.qty}"
           style="width:90px;">
-      </div></div>
+      </div>
+      <div style="margin-top:10px;">
+        <h3 style="margin-bottom:6px;">Note <span class="faint">(optional)</span></h3>
+        <textarea id="opt-note" rows="2" maxlength="180"
+          placeholder="E.g. extra napkins, no onions on top, birthday cake…"
+          style="width:100%; font-family:inherit; font-size:13px;">${escapeHtml(state.note)}</textarea>
+      </div>
+      </div>
       <div class="m-foot">
         <button class="btn" id="opt-cancel">Cancel</button>
         <button class="btn primary" id="opt-add">Add to Order</button>
@@ -1341,6 +1382,8 @@ const POSPage = {
       document.getElementById("opt-qty").addEventListener("input", e=>{
         state.qty = Math.max(1, Math.min(99, Number(e.target.value)||1));
       });
+      const noteEl = document.getElementById("opt-note");
+      noteEl.addEventListener("input", e=>{ state.note = e.target.value; });
       document.getElementById("opt-add").addEventListener("click", ()=>finalize());
 
       document.getElementById("modal").querySelectorAll(".opt-chip").forEach(btn=>{
@@ -1362,7 +1405,14 @@ const POSPage = {
             if (!grp.multi) state.groups[g] = { [l]: true };
             else state.groups[g][l] = !state.groups[g][l];
           }
+          /* Preserve focus on note area if it was active */
+          const active = document.activeElement;
+          const wasNote = active && active.id === "opt-note";
           rebuild();
+          if (wasNote){
+            const el = document.getElementById("opt-note");
+            if (el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+          }
         });
       });
     };
@@ -1400,8 +1450,9 @@ const POSPage = {
         }
       }
       const unit = computeUnitPrice(p, chosen);
+      const note = (state.note||"").trim();
       Modal.close();
-      this.addItemToCart(p, state.qty, chosen, unit);
+      this.addItemToCart(p, state.qty, chosen, unit, note);
     };
 
     Modal.open("");
@@ -1418,10 +1469,12 @@ const POSPage = {
     const s = DB.settings;
     wrap.innerHTML = items.map(it=>{
       const opts = (it.options||[]).map(o=>o.label).join(", ");
+      const note = (it.note||"").trim();
       return `<div class="cart-line" data-key="${escapeHtml(it.key)}">
         <div class="info">
           <div class="nm">${escapeHtml(it.emoji||"")} ${escapeHtml(it.name)}</div>
           ${opts?`<div class="opts">${escapeHtml(opts)}</div>`:""}
+          ${note?`<div class="note">📝 ${escapeHtml(note)}</div>`:""}
           <div class="unit">${fmtMoney(it.unit, s.currency_symbol)}  (${fmtMoneySecondary(it.unit, s)})</div>
         </div>
         <div class="qty-ctrl">
@@ -1508,9 +1561,11 @@ const POSPage = {
         key:String(i.id), product_id:i.product_id, name:i.name, emoji:"",
         qty:i.qty, unit:i.unit_price,
         options: String(i.options||"").split(",").map(t=>({label:t.trim()})).filter(x=>x.label),
+        note: i.note||"",
         line:i.line_total,
       })),
       customer_id:o.customer_id, customer_name:o.customer_name || "",
+      customer_phone:o.customer_phone || "",
       discount:Number(o.discount)||0, delivery:Number(o.delivery)||0,
     };
     document.getElementById("pos-order-lbl").textContent = "Order " + o.order_no;
@@ -1522,7 +1577,7 @@ const POSPage = {
   newOrder(){
     this.current_order = {
       id:null, no: DB.nextOrderNo(), type:"Delivery",
-      items:[], customer_id:null, customer_name:"",
+      items:[], customer_id:null, customer_name:"", customer_phone:"",
       discount:0, delivery:0, subtotal:0, tax:0, total:0,
     };
     document.getElementById("pos-order-lbl").textContent =
@@ -1542,9 +1597,10 @@ const POSPage = {
     if (!this.current_order || !this.current_order.items.length){
       toast("Nothing to hold", "warning"); return;
     }
-    const { id, name } = this.resolveCustomer();
+    const { id, name, phone } = this.resolveCustomer();
     this.current_order.customer_id = id;
     this.current_order.customer_name = name;
+    this.current_order.customer_phone = phone;
     DB.saveOrder(this.current_order, "open");
     DB.saveAll();
     toast(`Order ${this.current_order.no} held`, "success");
@@ -1592,9 +1648,10 @@ const POSPage = {
   },
 
   finalizePayment(){
-    const { id, name } = this.resolveCustomer();
+    const { id, name, phone } = this.resolveCustomer();
     this.current_order.customer_id = id;
     this.current_order.customer_name = name;
+    this.current_order.customer_phone = phone;
     this.current_order.payment_method = "Cash";
     this.current_order.user_id = App.user ? App.user.id : null;
     DB.saveOrder(this.current_order, "paid");
@@ -1604,9 +1661,10 @@ const POSPage = {
     const snapshot = {
       id:this.current_order.id, no:this.current_order.no,
       type:this.current_order.type || "Delivery",
-      customer_id:id, customer_name:name,
+      customer_id:id, customer_name:name, customer_phone:phone,
       items:this.current_order.items.map(i=>({
-        name:i.name, qty:i.qty, unit:i.unit, line:i.line, options:i.options||[],
+        name:i.name, qty:i.qty, unit:i.unit, line:i.line,
+        options:i.options||[], note:i.note||"",
       })),
       subtotal:this.current_order.subtotal, discount:this.current_order.discount,
       tax:this.current_order.tax, delivery:this.current_order.delivery,
@@ -2232,22 +2290,27 @@ const SettingsPage = {
       const printer = $("s-printer").value.trim();
       if (!printer){ toast("Enter the printer name first", "warning"); return; }
       const sample = {
-        no:"TEST-0001", type:"Delivery", customer_name:"Test Customer",
+        no:"TEST-0001", type:"Delivery",
+        customer_name:"Test Customer", customer_phone:"+961 71 234 567",
         items:[
           {name:"Margherita Pizza", qty:1, unit:1100000, line:1100000,
-            options:[{label:"Large"},{label:"Margherita"},{label:"Pepperoni"}]},
+            options:[{label:"Large"},{label:"Margherita"},{label:"Pepperoni"},
+                     {label:"Without Olive"},{label:"Without Sauce"}],
+            note:"Extra cheese on top"},
           {name:"Chicken BBQ Pizza", qty:1, unit:1200000, line:1200000,
-            options:[]},
+            options:[], note:""},
           {name:"Cheese Garlic Fingers", qty:1, unit:700000, line:700000,
-            options:[{label:"Medium"}]},
+            options:[{label:"Medium"}], note:""},
           {name:"Chicken Wings", qty:1, unit:800000, line:800000,
-            options:[{label:"12 pcs + Fries"}]},
+            options:[{label:"12 pcs + Fries"}], note:"Extra spicy"},
           {name:"Chicken Strips", qty:1, unit:1300000, line:1300000,
-            options:[{label:"10 pcs"}]},
+            options:[{label:"10 pcs"}], note:""},
           {name:"Special Offer (5 pcs + Fries + Pepsi)", qty:1,
-            unit:1000000, line:1000000, options:[]},
-          {name:"Fries", qty:1, unit:600000, line:600000, options:[{label:"XXL"}]},
-          {name:"Soft Drink", qty:2, unit:100000, line:200000, options:[{label:"300ml"}]},
+            unit:1000000, line:1000000, options:[], note:""},
+          {name:"Fries", qty:1, unit:600000, line:600000,
+            options:[{label:"XXL"}], note:""},
+          {name:"Soft Drink", qty:2, unit:100000, line:200000,
+            options:[{label:"300ml"}], note:""},
         ],
         subtotal:7000000, discount:0, tax:0, delivery:270000, total:7270000,
         payment_method:"Cash",
@@ -2338,12 +2401,14 @@ function buildReceiptText(order, settings, copyLabel=""){
   const when = new Date().toLocaleString([], { hour12:false });
   lines.push(lr("Order: " + order.no, when));
   if (order.customer_name) lines.push("Customer: " + order.customer_name);
+  if (order.customer_phone) lines.push("Phone: " + order.customer_phone);
   lines.push("Type: " + (order.type || "Delivery"));
   lines.push(sep("-"));
   for (const it of order.items){
     lines.push(it.name);
     const opts = (it.options||[]).map(o=>o.label).join(", ");
     if (opts) lines.push("  " + opts);
+    if (it.note) lines.push("  Note: " + it.note);
     lines.push(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym),
                   fmtMoney(it.line, sym)));
   }
@@ -2478,6 +2543,7 @@ const CloudSync = {
     const doc = {
       order_no: o.no, order_type: o.type, customer: o.customer_name||"",
       customer_id: o.customer_id||null,
+      customer_phone: o.customer_phone||"",
       subtotal: +o.subtotal||0, discount: +o.discount||0,
       delivery: +o.delivery||0, total: +o.total||0,
       currency: (DB.settings.currency_symbol||"LBP ").trim(),
@@ -2487,6 +2553,7 @@ const CloudSync = {
         name:i.name||"", qty:+i.qty||1,
         unit:+i.unit||0, line:+i.line||0,
         options:(i.options||[]).map(x=>x.label||""),
+        note:i.note||"",
       })),
     };
     const res = await FirebaseSync.pushDocument(
@@ -2520,10 +2587,9 @@ const CloudSync = {
 };
 
 /* ═════════════════════════════════════════════════════════════════════════
-   PWA — runtime manifest, install prompt
+   PWA
    ═════════════════════════════════════════════════════════════════════════ */
 function setupPWA(){
-  /* Draw the pizza emoji onto a canvas and export as PNG data URL. */
   function makeIcon(size){
     const c = document.createElement("canvas");
     c.width = size; c.height = size;
@@ -2531,33 +2597,22 @@ function setupPWA(){
     const r = size * 0.18;
     ctx.fillStyle = "#0f172a";
     if (ctx.roundRect){
-      ctx.beginPath();
-      ctx.roundRect(0, 0, size, size, r);
-      ctx.fill();
-    } else {
-      ctx.fillRect(0, 0, size, size);
-    }
+      ctx.beginPath(); ctx.roundRect(0, 0, size, size, r); ctx.fill();
+    } else { ctx.fillRect(0, 0, size, size); }
     ctx.font = `${Math.round(size * 0.66)}px "Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    try {
-      ctx.fillText("🍕", size/2, size/2 + size * 0.04);
-    } catch(e){ /* emoji may fail on some systems */ }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    try { ctx.fillText("🍕", size/2, size/2 + size * 0.04); } catch(e){}
     return c.toDataURL("image/png");
   }
   let icon192 = "", icon512 = "";
   try { icon192 = makeIcon(192); icon512 = makeIcon(512); } catch(e){}
 
   const manifest = {
-    name: "Pizza POS",
-    short_name: "PizzaPOS",
+    name: "Pizza POS", short_name: "PizzaPOS",
     description: "Restaurant Management Suite",
-    start_url: ".",
-    scope: ".",
-    display: "standalone",
+    start_url: ".", scope: ".", display: "standalone",
     orientation: "any",
-    background_color: "#f4f6f9",
-    theme_color: "#0f172a",
+    background_color: "#f4f6f9", theme_color: "#0f172a",
     icons: [
       { src: icon192, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: icon512, sizes: "512x512", type: "image/png", purpose: "any" },
@@ -2575,9 +2630,8 @@ function setupPWA(){
       document.head.appendChild(link);
     }
     link.href = url;
-  }catch(e){ /* manifest generation failed — the app still works */ }
+  }catch(e){}
 
-  /* Set apple-touch-icon so iOS "Add to Home Screen" uses our icon. */
   try{
     let ati = document.querySelector('link[rel="apple-touch-icon"]');
     if (!ati){
@@ -2588,7 +2642,6 @@ function setupPWA(){
     ati.href = icon192;
   }catch(e){}
 
-  /* Install prompt */
   let deferredPrompt = null;
   const installBtn = document.getElementById("install-btn");
   window.addEventListener("beforeinstallprompt", (e)=>{
@@ -2610,16 +2663,12 @@ function setupPWA(){
       deferredPrompt.prompt();
       try{
         const choice = await deferredPrompt.userChoice;
-        if (choice && choice.outcome === "accepted") {
-          toast("Installing…", "success");
-        }
+        if (choice && choice.outcome === "accepted") toast("Installing…", "success");
       }catch(e){}
       deferredPrompt = null;
       installBtn.classList.remove("show");
     });
   }
-
-  /* Hide install button if already installed (standalone display mode). */
   if (window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true){
     if (installBtn) installBtn.classList.remove("show");
@@ -2661,18 +2710,13 @@ const App = {
   },
 
   bindMisc(){
-    /* Cart FAB opens the mobile cart sheet. */
     const fab = document.getElementById("cart-fab");
     if (fab) fab.addEventListener("click", ()=>POSPage.openCartSheet());
 
-    /* Re-evaluate FAB visibility on resize / orientation change. */
-    const refresh = ()=>{
-      POSPage.updateCartFab();
-    };
+    const refresh = ()=>{ POSPage.updateCartFab(); };
     window.addEventListener("resize", refresh);
     window.addEventListener("orientationchange", ()=>setTimeout(refresh, 200));
 
-    /* Theme button */
     document.getElementById("theme-btn").addEventListener("click", ()=>{
       const cur = DB.settings.theme || "light";
       const next = cur === "light" ? "dark" : "light";
@@ -2682,7 +2726,6 @@ const App = {
       if (sel) sel.value = next;
     });
 
-    /* Nav buttons */
     document.querySelectorAll(".navbtn").forEach(b=>{
       b.addEventListener("click", ()=>this.nav(b.dataset.page));
     });
@@ -2723,7 +2766,7 @@ const App = {
 
     if (page === "pos"){
       POSPage.renderTabs(); POSPage.renderProducts(); POSPage.recalc();
-      if (!isMobile()) POSPage.closeCartSheet(); // reset sheet state on desktop
+      if (!isMobile()) POSPage.closeCartSheet();
     } else if (page === "products") ProductsPage.render();
     else if (page === "customers")  CustomersPage.render();
     else if (page === "expenses")   ExpensesPage.render();
