@@ -1,1 +1,4055 @@
-🍕
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pizza POS">
+<meta name="description" content="Pizza POS — Restaurant Management Suite">
+<title>Pizza POS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%8D%95%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface2:#f8fafc; --surface3:#eef2f7;
+  --border:#e5e9f0; --text:#0f172a; --text2:#475569; --text3:#94a3b8;
+  --primary:#0f172a; --on-primary:#ffffff;
+  --success:#16a34a; --danger:#ef4444; --warn:#f59e0b;
+  --shadow:0 2px 8px rgba(15,23,42,.06);
+}
+body.dark{
+  --bg:#0a0f1c; --surface:#111827; --surface2:#161f31; --surface3:#1d2739;
+  --border:#243049; --text:#f1f5f9; --text2:#a3b1c6; --text3:#64748b;
+  --primary:#f8fafc; --on-primary:#0f172a;
+  --shadow:0 2px 8px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;
+  font-family:'Inter','Segoe UI','Helvetica Neue','Noto Color Emoji','Apple Color Emoji',sans-serif;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);}
+body{font-size:13px; overflow:hidden;}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea,button{font-size:13px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+.btn{background:var(--surface2); color:var(--text); border:1px solid var(--border);
+  border-radius:10px; padding:7px 14px; font-size:12px; font-weight:600;}
+.btn:hover{background:var(--surface3);}
+.btn:disabled{color:var(--text3); cursor:not-allowed; opacity:.7;}
+.btn.primary{background:var(--primary); color:var(--on-primary); border:none;}
+.btn.success{background:var(--success); color:#fff; border:none;}
+.btn.danger{background:var(--danger); color:#fff; border:none;}
+.btn.warn{background:var(--warn); color:#fff; border:none;}
+.btn.ghost{background:transparent;}
+.btn.chip{background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:6px 14px; font-weight:600; color:var(--text2);}
+.btn.chip:hover{background:var(--surface2);}
+.btn.chip.active{background:var(--primary); color:var(--on-primary); border-color:var(--primary);}
+.btn.icon{background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 10px;}
+
+input,select,textarea{background:var(--surface2); border:1px solid var(--border);
+  border-radius:9px; padding:8px 10px; font-size:13px; color:var(--text);
+  width:100%; outline:none; transition:border .15s; -webkit-appearance:none; appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);}
+textarea{resize:vertical; font-family:inherit;}
+
+.card{background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);}
+h1{font-size:18px; font-weight:800; letter-spacing:-.3px; margin:0 0 8px;}
+h2{font-size:14px; font-weight:700; margin:0;}
+h3{font-size:12px; font-weight:700; color:var(--text2); margin:0;}
+.muted{color:var(--text2);}
+.faint{color:var(--text3);}
+.sep{background:var(--border); height:1px; border:none; margin:8px 0;}
+
+table{width:100%; border-collapse:collapse; font-size:12px;}
+th{background:var(--surface2); color:var(--text2); padding:8px; text-align:left;
+  font-size:11px; font-weight:700; border-bottom:1px solid var(--border); white-space:nowrap;}
+td{padding:7px 8px; border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--surface2);}
+
+#app{display:none; height:100%;}
+#app.on{display:grid; grid-template-columns:76px 1fr; height:100dvh;}
+.sidebar{background:var(--surface); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; align-items:center; padding:14px 10px; gap:6px; overflow-y:auto;}
+.sidebar .logo{font-size:30px; padding-bottom:10px;}
+.navbtn{background:transparent; border:none; border-radius:12px; font-size:20px;
+  width:52px; height:52px; color:var(--text3); display:flex; align-items:center;
+  justify-content:center; flex-shrink:0;}
+.navbtn:hover{background:var(--surface2); color:var(--text);}
+.navbtn.active{background:var(--primary); color:var(--on-primary);}
+.avatar{margin-top:auto; background:var(--primary); color:var(--on-primary);
+  width:36px; height:36px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;}
+.main{display:grid; grid-template-rows:52px 1fr; overflow:hidden; min-width:0;}
+.topbar{background:var(--surface); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; padding:0 16px; gap:10px;}
+.topbar h1{margin:0; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.topbar .spacer{flex:1;}
+.pages-host{overflow:hidden; position:relative; height:100%;}
+
+.page{display:none; height:100%;}
+.page.on{display:block; overflow:auto; padding:14px;}
+#page-pos{padding:0;}
+#page-pos.on{display:grid; grid-template-columns:1fr 440px; gap:14px;
+  padding:14px; box-sizing:border-box; overflow:hidden;}
+
+#login{position:fixed; inset:0; background:var(--bg); z-index:100;
+  display:flex; align-items:center; justify-content:center; padding:20px;}
+#login .box{width:380px; max-width:100%; padding:40px 40px 30px; text-align:center;}
+#login .logo{font-size:60px; line-height:1;}
+#login h1{margin:10px 0 4px; font-size:22px;}
+#login .sub{color:var(--text3); margin-bottom:24px;}
+#login input{margin-bottom:10px; padding:11px 12px; text-align:left;}
+#login .err{color:var(--danger); font-size:11px; min-height:16px; margin-bottom:6px;}
+#login button{width:100%; padding:12px; font-size:14px; margin-top:6px;}
+#login .hint{color:var(--text3); font-size:11px; margin-top:14px;}
+#login .cloud{margin-top:10px; font-size:11px;}
+
+.pos-left{display:flex; flex-direction:column; gap:10px; min-height:0; height:100%; min-width:0;}
+.pos-right{display:flex; flex-direction:column; padding:14px; gap:10px;
+  overflow:hidden; min-height:0; height:100%;}
+.cat-bar{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;}
+.cat-bar::-webkit-scrollbar{height:0;}
+.product-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr));
+  gap:8px; overflow:auto; flex:1; align-content:start;}
+.product-card{background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:10px 8px 8px; height:118px;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  cursor:pointer; transition:border .15s, transform .08s; user-select:none;}
+.product-card:active{transform:scale(.97);}
+.product-card:hover{border-color:var(--text3);}
+.product-card .emoji{font-size:26px; line-height:1;}
+.product-card .name{font-size:11px; font-weight:600; text-align:center;
+  line-height:1.2; flex:1; overflow:hidden;}
+.product-card .badge{color:var(--danger); font-size:9px; font-weight:700;}
+
+.tabs-bar{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;}
+.tabs-bar::-webkit-scrollbar{height:0;}
+.cart-list{flex:1; overflow:auto; min-height:80px;
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+  padding:6px 0;}
+.cart-empty{color:var(--text3); text-align:center; padding:30px 10px; font-size:12px;}
+.cart-line{display:flex; align-items:flex-start; gap:8px; padding:8px 0;
+  border-bottom:1px solid var(--border);}
+.cart-line:last-child{border-bottom:none;}
+.cart-line .info{flex:1; min-width:0;}
+.cart-line .nm{font-weight:600; font-size:12px;}
+.cart-line .opts{color:var(--text3); font-size:10px; word-break:break-word;}
+.cart-line .note{color:var(--warn); font-size:10px; word-break:break-word; font-style:italic; margin-top:2px;}
+.cart-line .unit{color:var(--text3); font-size:9px; margin-top:2px;}
+.cart-line .qty-ctrl{display:flex; align-items:center; gap:2px; flex-shrink:0; margin-top:2px;}
+.cart-line .qty-ctrl button{background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; width:26px; height:26px; padding:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px;}
+.cart-line .qty-ctrl .q{min-width:22px; text-align:center; font-weight:700; font-size:12px;}
+.cart-line .total{min-width:88px; text-align:right; font-weight:700; font-size:11px;
+  flex-shrink:0; margin-top:2px;}
+.cart-line .total .usd{color:var(--text3); font-size:9px; font-weight:400;}
+
+.totals{padding:6px 0; font-size:12px;}
+.totals .row{display:flex; justify-content:space-between; padding:3px 0; align-items:center; gap:8px;}
+.totals .row.disc input{width:110px; padding:5px 6px; font-size:11px; text-align:right;}
+.totals .grand{font-size:15px; font-weight:800; padding-top:6px;}
+.pos-actions{display:flex; gap:6px; flex-shrink:0;}
+.pos-actions button{flex:1; padding:10px;}
+.pos-actions .pay{flex:2; font-size:14px;}
+
+.cust-row{display:flex; gap:6px; position:relative;}
+.cust-row .picker{flex:1; position:relative;}
+.cust-row .picker input{padding-left:28px; padding-right:28px;}
+.cust-row .picker .ico{position:absolute; left:10px; top:50%;
+  transform:translateY(-50%); pointer-events:none;}
+.cust-row .picker .arrow{position:absolute; right:10px; top:50%;
+  transform:translateY(-50%); color:var(--text3); pointer-events:none;}
+.cust-list{position:absolute; top:calc(100% + 2px); left:0; right:0; max-height:220px;
+  overflow:auto; background:var(--surface); border:1px solid var(--border);
+  border-radius:9px; box-shadow:var(--shadow); z-index:30; display:none;}
+.cust-list.on{display:block;}
+.cust-list .item{padding:10px; cursor:pointer; font-size:13px;
+  border-bottom:1px solid var(--border);}
+.cust-list .item:last-child{border-bottom:none;}
+.cust-list .item:hover{background:var(--surface2);}
+.cust-list .item .ph{color:var(--text3); font-size:11px;}
+
+.page-head{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.page-head h1{margin:0; flex:1; min-width:120px;}
+.table-wrap{background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; overflow-x:auto;}
+.table-wrap table{min-width:520px;}
+
+.modal-bg{position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:200;
+  display:none; align-items:center; justify-content:center; padding:20px;
+  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);}
+.modal-bg.on{display:flex;}
+.modal{background:var(--surface); border-radius:16px; max-width:640px; width:100%;
+  max-height:90vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,.3);}
+.modal .m-head{padding:16px 20px 8px; display:flex; align-items:center; gap:10px;}
+.modal .m-head h1,.modal .m-head h2{flex:1; margin:0;}
+.modal .m-body{padding:8px 20px 14px;}
+.modal .m-foot{padding:12px 20px 16px; display:flex; gap:8px; justify-content:flex-end;
+  border-top:1px solid var(--border);}
+
+.opt-group{margin-bottom:14px;}
+.opt-group h3{margin-bottom:6px;}
+.opt-chips{display:flex; flex-wrap:wrap; gap:6px;}
+.opt-chip{background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:8px 14px; font-weight:600; color:var(--text2); font-size:13px;}
+.opt-chip:hover{background:var(--surface2);}
+.opt-chip.on{background:var(--primary); color:var(--on-primary); border-color:var(--primary);}
+
+.report-controls{display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+.report-controls input[type=date]{width:auto;}
+.cards-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:10px; margin-bottom:12px;}
+.metric-card{padding:12px 14px;}
+.metric-card .lbl{font-size:11px; color:var(--text3);}
+.metric-card .val{font-size:16px; font-weight:800; margin-top:2px; word-break:break-word;}
+.report-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+  gap:12px; margin-bottom:12px;}
+.report-box{padding:12px; max-height:340px; overflow:auto;}
+.report-box h3{margin-bottom:8px;}
+
+#toasts{position:fixed; bottom:20px; right:20px; z-index:300;
+  display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  pointer-events:none; max-width:calc(100vw - 40px);}
+.toast{background:var(--surface); border:1px solid var(--border);
+  border-left:3px solid var(--primary); border-radius:12px; padding:10px 14px;
+  font-size:12px; font-weight:600; box-shadow:var(--shadow);
+  animation:slideIn .2s ease-out; max-width:340px; pointer-events:auto;
+  white-space:pre-wrap; word-break:break-word;}
+.toast.success{border-left-color:var(--success);}
+.toast.error{border-left-color:var(--danger);}
+.toast.warning{border-left-color:var(--warn);}
+@keyframes slideIn{from{opacity:0; transform:translateX(20px);} to{opacity:1; transform:translateX(0);}}
+
+.two-col{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.form-row{display:grid; grid-template-columns:180px 1fr; gap:10px;
+  align-items:center; margin-bottom:8px;}
+.form-row label{color:var(--text2); font-size:12px;}
+.form-row.checkbox{grid-template-columns:1fr; gap:4px;}
+.form-row.checkbox label{display:flex; align-items:center; gap:8px; cursor:pointer;}
+.form-row.checkbox input[type=checkbox]{width:auto;}
+
+.cart-fab{position:fixed; bottom:calc(72px + env(safe-area-inset-bottom, 0px));
+  right:14px; z-index:60; background:var(--primary); color:var(--on-primary);
+  border:none; border-radius:24px; padding:10px 18px;
+  display:none; align-items:center; gap:8px; font-weight:700; font-size:13px;
+  box-shadow:0 6px 20px rgba(0,0,0,.25); cursor:pointer;}
+.cart-fab .count{background:rgba(255,255,255,.18); border-radius:12px; padding:1px 8px; font-size:12px;}
+body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
+.cart-fab.hidden{display:none !important;}
+.cart-close{display:none;}
+
+#receipt-area{display:none;}
+
+.pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px;
+  border-radius:12px; font-size:11px; font-weight:700; border:1px solid var(--border);
+  background:var(--surface2); color:var(--text2); cursor:pointer; flex-shrink:0;}
+.pill .dot{width:8px; height:8px; border-radius:50%; background:var(--text3);}
+.pill.ok .dot{background:var(--success);}
+.pill.bad .dot{background:var(--danger);}
+.pill.warn .dot{background:var(--warn);}
+
+.seg{display:inline-flex; border:1px solid var(--border); border-radius:10px;
+  overflow:hidden; background:var(--surface2); flex-wrap:wrap;}
+.seg button{background:transparent; border:none; padding:8px 14px; font-weight:700;
+  color:var(--text2); font-size:12px;}
+.seg button.on{background:var(--primary); color:var(--on-primary);}
+
+.diag{background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px; font-family:ui-monospace,monospace;
+  font-size:11px; line-height:1.6; color:var(--text2); white-space:pre-wrap;
+  word-break:break-word; max-height:220px; overflow:auto;}
+.diag .ok{color:var(--success); font-weight:700;}
+.diag .bad{color:var(--danger); font-weight:700;}
+.diag .warn{color:var(--warn); font-weight:700;}
+
+/* ── Install helper ───────────────────────────────────────────── */
+.install-steps{margin:0; padding-left:18px; line-height:1.9; font-size:13px;}
+.install-steps li{margin-bottom:2px;}
+.install-warn{background:var(--surface2); border:1px solid var(--border);
+  border-left:3px solid var(--warn); border-radius:10px; padding:10px 12px;
+  font-size:12px; line-height:1.6; margin-top:12px;}
+
+@media (max-width:900px){
+  body{overflow:hidden;}
+  #app.on{grid-template-columns:1fr; grid-template-rows:1fr auto; height:100dvh;}
+  .sidebar{order:2; flex-direction:row; justify-content:space-around; align-items:center;
+    width:100%; height:auto; padding:4px 4px max(4px, env(safe-area-inset-bottom, 0px));
+    border-right:none; border-top:1px solid var(--border); gap:0; overflow-x:auto;}
+  .sidebar .logo, .sidebar .avatar{display:none;}
+  .navbtn{width:44px; height:44px; font-size:22px; border-radius:10px; flex:1 1 0; max-width:80px;}
+  .main{order:1; grid-template-rows:48px 1fr;}
+  .topbar{padding:0 10px; gap:6px;}
+  .topbar h1{font-size:15px;}
+  #install-btn{display:none;}
+  #install-btn.show{display:inline-flex;}
+  #user-who{display:none;}
+  .pill{padding:4px 8px; font-size:10px;}
+  #page-pos.on{grid-template-columns:1fr; padding:8px; gap:8px;}
+  .pos-left{padding:0;}
+  .pos-right{position:fixed; top:0; left:0; right:0; bottom:0; z-index:80;
+    border-radius:0; border:none; transform:translateX(100%);
+    transition:transform .25s cubic-bezier(.2,.8,.3,1);
+    padding:14px; max-width:100vw; height:100dvh; width:100vw;}
+  .pos-right.open{transform:translateX(0);}
+  .cart-close{display:inline-flex !important;}
+  .product-grid{grid-template-columns:repeat(auto-fill, minmax(108px,1fr)); gap:6px;}
+  .product-card{height:110px;}
+  .product-card .emoji{font-size:24px;}
+  .product-card .name{font-size:10.5px;}
+  .cart-fab{display:flex;}
+  .modal-bg{padding:0;}
+  .modal{max-width:none; width:100%; max-height:100dvh; height:100dvh; border-radius:0;}
+  .two-col{grid-template-columns:1fr;}
+  .form-row{grid-template-columns:1fr; gap:4px;}
+  .form-row label{font-size:11px;}
+  .cards-row{grid-template-columns:repeat(2, 1fr);}
+  .report-grid{grid-template-columns:1fr;}
+  #login .box{padding:30px 22px 24px;}
+  #login .logo{font-size:52px;}
+  .table-wrap table{min-width:420px;}
+}
+@media (max-width:420px){
+  .cards-row{grid-template-columns:1fr;}
+  .product-grid{grid-template-columns:repeat(auto-fill, minmax(94px,1fr));}
+}
+@media print{
+  body > *:not(#receipt-area){display:none !important;}
+  #receipt-area{display:block !important; position:absolute; top:0; left:0;
+    width:100%; background:#fff; color:#000;}
+  .receipt-copy{font-family:'Courier New', ui-monospace, monospace;
+    font-size:12px; line-height:1.35; white-space:pre; padding:6mm 4mm; color:#000;}
+  .receipt-copy + .receipt-copy{page-break-before:always;}
+  @page{size:80mm auto; margin:0;}
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card box">
+    <div class="logo">🍕</div>
+    <h1>Pizza POS</h1>
+    <div class="sub">Restaurant Management Suite</div>
+    <input id="login-user" type="text" placeholder="Username" value="admin" autocomplete="username">
+    <input id="login-pass" type="password" placeholder="Password" value="admin123" autocomplete="current-password">
+    <div class="err" id="login-err"></div>
+    <button class="btn primary" id="login-btn">Sign In</button>
+    <div class="hint">Default: admin / admin123</div>
+    <div class="hint cloud" id="login-cloud">☁ Connecting to shared database…</div>
+  </div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="logo">🍕</div>
+    <button class="navbtn" data-page="pos"       title="POS">🍕</button>
+    <button class="navbtn" data-page="products"  title="Products">📦</button>
+    <button class="navbtn" data-page="customers" title="Customers">👥</button>
+    <button class="navbtn" data-page="expenses"  title="Expenses">💸</button>
+    <button class="navbtn" data-page="reports"   title="Reports">📊</button>
+    <button class="navbtn" data-page="settings"  title="Settings">⚙️</button>
+    <div class="avatar" id="user-avatar">AD</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <h1 id="page-title">POS</h1>
+      <div class="spacer"></div>
+      <span class="pill" id="cloud-pill" title="Shared database status — click for details">
+        <span class="dot"></span><span id="cloud-pill-txt">Sync</span>
+      </span>
+      <span class="pill" id="printer-pill" title="Printer status — click for diagnostics">
+        <span class="dot"></span><span id="printer-pill-txt">Printer</span>
+      </span>
+      <button class="btn icon" id="install-btn" title="Install app">📲</button>
+      <button class="btn icon" id="theme-btn" title="Toggle theme">🌓</button>
+      <span class="muted" id="user-who" style="font-size:12px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis; max-width:140px;">—</span>
+    </div>
+    <div class="pages-host">
+      <div id="page-pos"       class="page"></div>
+      <div id="page-products"  class="page"></div>
+      <div id="page-customers" class="page"></div>
+      <div id="page-expenses"  class="page"></div>
+      <div id="page-reports"   class="page"></div>
+      <div id="page-settings"  class="page"></div>
+    </div>
+  </div>
+</div>
+
+<button class="cart-fab hidden" id="cart-fab">
+  <span>🛒</span>
+  <span class="count" id="cart-fab-count">0</span>
+  <span id="cart-fab-total">LBP 0</span>
+</button>
+
+<div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
+<div id="toasts"></div>
+<div id="receipt-area"></div>
+
+<!-- ═══════════ Firebase SDK (compat) — used for the shared multi-device database ═══════════ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
+<script>
+"use strict";
+
+/* ═══════════════════ CONSTANTS ═══════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCmj9fwRLmiQU-g5zvd6XzE8i2X9eNr7TQ",
+  authDomain:"hyperpos-12210.firebaseapp.com",
+  projectId:"hyperpos-12210",
+  storageBucket:"hyperpos-12210.firebasestorage.app",
+  messagingSenderId:"641877559339",
+  appId:"1:641877559339:web:b95061f96efe5da489026e",
+};
+
+/* ── Shared (multi-device) collections ─────────────────────────────
+   Every device reads/writes the SAME Firestore collections, so
+   products, orders, customers, expenses, settings and users stay
+   identical on all 3–4 devices in real time.                        */
+const COLLECTIONS = {
+  settings:    { name:"pos_settings",    single:true  },
+  users:       { name:"pos_users",       single:false },
+  categories:  { name:"pos_categories",  single:false },
+  products:    { name:"pos_products",    single:false },
+  customers:   { name:"pos_customers",   single:false },
+  orders:      { name:"pos_orders",      single:false },
+  order_items: { name:"pos_order_items", single:false },
+  expenses:    { name:"pos_expenses",    single:false },
+  stock_moves: { name:"pos_stock_moves", single:false },
+};
+const COLLECTION_KEYS = Object.keys(COLLECTIONS);
+
+const CHICKEN_BBQ_LARGE_PRICE = 1_200_000;
+
+const EXTRAS_GROUP_NAME = "Extras";
+const EXTRAS_CHOICES = [
+  { label:"Without Olive",    price:0 },
+  { label:"Without Pepper",   price:0 },
+  { label:"Without Mushroom", price:0 },
+  { label:"Without Oregano",  price:0 },
+  { label:"Without Sauce",    price:0 },
+];
+function freshExtrasChoices(){
+  return EXTRAS_CHOICES.map(c => ({ label:c.label, price:0 }));
+}
+
+const DEFAULT_OPTIONS = [
+  { name:"Size", multi:false, choices:[
+    { label:"Small",  price: 750000 },
+    { label:"Medium", price: 900000 },
+    { label:"Large",  price:1100000 },
+  ]},
+  { name:"Flavor", multi:true, max_choices:2, large_only:true, choices:[
+    { label:"Lebanese",    price:0 },
+    { label:"Pepperoni",   price:0 },
+    { label:"Vegetarian",  price:0 },
+    { label:"Margherita",  price:0 },
+    { label:"Plain",       price:0 },
+    { label:"Chicken BBQ", price:0 },
+  ]},
+  { name:EXTRAS_GROUP_NAME, multi:true, choices:freshExtrasChoices() },
+];
+
+const DEFAULT_SETTINGS = {
+  restaurant_name: "Pizza POS",
+  tagline:         "Restaurant Management Suite",
+  address:         "123 Main Street",
+  phone:           "+961 1 234 567",
+  currency_symbol: "LBP ",
+  secondary_currency:"USD",
+  secondary_rate:  "90000",
+  delivery_fee:    "270000",
+  theme:           "light",
+  receipt_footer:  "Thank you for your visit!",
+  product_options: JSON.stringify(DEFAULT_OPTIONS),
+  low_stock_default:"5",
+
+  printer_name:       "",
+  printer_auto:       "1",
+  printer_mode:       "browser",  // browser | usb | agent | cloud
+  printer_copies:     "2",
+  printer_cut:        "partial",  // none | partial | full
+  printer_drawer:     "0",
+  printer_agent_url:  "",
+  printer_agent_token:"",
+
+  firebase_enabled:"1",           // shared cloud database ON by default
+  firebase_collection_orders:"orders",
+  firebase_collection_customers:"customers",
+  firebase_collection_cash:"close_cash",
+  firebase_collection_print_jobs:"print_jobs",
+
+  options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1", order_v1:"1",
+};
+
+/* ── Pizza is deliberately first everywhere ─────────────────────── */
+const SEED_CATEGORIES = ["Pizza","Sides","Chicken","Drinks"];
+
+const SEED_PRODUCTS = [
+  ["Lebanese Pizza","🍕","Pizza",0,0,0,0,1],
+  ["Pepperoni Pizza","🍕","Pizza",0,0,0,0,1],
+  ["Vegetarian Pizza","🥬","Pizza",0,0,0,0,1],
+  ["Margherita Pizza","🍕","Pizza",0,0,0,0,1],
+  ["Plain Pizza","🍕","Pizza",0,0,0,0,1],
+  ["Chicken BBQ Pizza","🍕","Pizza",1200000,0,0,0,0],
+  ["Cheese Garlic Fingers","🧄","Sides",0,180000,50,1,1],
+  ["Fries","🍟","Sides",0,100000,60,1,1],
+  ["Chicken Wings","🍗","Chicken",0,0,0,0,1],
+  ["Chicken Strips","🍗","Chicken",0,0,0,0,1],
+  ["Special Offer (5 pcs + Fries + Pepsi)","🎁","Chicken",1000000,0,0,0,0],
+  ["Soft Drink","🥤","Drinks",0,55000,120,1,1],
+];
+
+const CUSTOM_OPTIONS = {
+  "Cheese Garlic Fingers":[
+    { name:"Size", multi:false, choices:[
+      { label:"Small",  price:600000 },
+      { label:"Medium", price:700000 },
+    ]}
+  ],
+  "Fries":[
+    { name:"Size", multi:false, choices:[
+      { label:"Small",  price:300000 },
+      { label:"Medium", price:400000 },
+      { label:"XXL",    price:600000 },
+    ]}
+  ],
+  "Chicken Wings":[
+    { name:"Portion", multi:false, choices:[
+      { label:"12 pcs",         price: 600000 },
+      { label:"12 pcs + Fries", price: 800000 },
+      { label:"24 pcs",         price:1100000 },
+    ]}
+  ],
+  "Chicken Strips":[
+    { name:"Portion", multi:false, choices:[
+      { label:"5 pcs",  price: 700000 },
+      { label:"10 pcs", price:1300000 },
+      { label:"20 pcs", price:2400000 },
+    ]}
+  ],
+  "Soft Drink":[
+    { name:"Size", multi:false, choices:[
+      { label:"300ml", price:100000 },
+      { label:"1.25L", price:200000 },
+    ]}
+  ],
+};
+
+/* ═══════════════════ LOCAL CACHE (offline mirror) ═══════════════════ */
+const STORE = {
+  prefix:"pizza_pos_",
+  get(key, fallback=null){
+    try{
+      const raw = localStorage.getItem(this.prefix + key);
+      return raw === null ? fallback : JSON.parse(raw);
+    }catch(e){ return fallback; }
+  },
+  set(key, val){
+    try{ localStorage.setItem(this.prefix + key, JSON.stringify(val)); }
+    catch(e){ console.error("Storage full?", e); }
+  },
+};
+
+/* ═══════════════════ HELPERS ═══════════════════ */
+function escapeHtml(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function cloneJson(o){ return JSON.parse(JSON.stringify(o)); }
+function fmtMoney(v, sym){
+  sym = sym || (DB.settings && DB.settings.currency_symbol) || "LBP ";
+  return sym + Math.round(Number(v)||0).toLocaleString("en-US");
+}
+function fmtMoneySecondary(v, s){
+  s = s || DB.settings || {};
+  const rate = Number(s.secondary_rate) || 90000;
+  const sec = (s.secondary_currency || "USD").toUpperCase();
+  const usd = (Number(v) || 0) / (rate || 1);
+  const sym = sec === "USD" ? "$" : sec + " ";
+  return sym + usd.toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtMoneyDual(v, s){ return fmtMoney(v, s && s.currency_symbol) + "  (" + fmtMoneySecondary(v, s) + ")"; }
+function nowIso(){ return new Date().toISOString(); }
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function addDaysStr(dateStr, days){
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function isMobile(){ return window.matchMedia("(max-width:900px)").matches; }
+function isSecureContext_(){
+  return (typeof window !== "undefined") &&
+    (window.isSecureContext === true || location.protocol === "https:" ||
+     location.hostname === "localhost" || location.hostname === "127.0.0.1");
+}
+function withTimeout(promise, ms){
+  return new Promise((resolve, reject)=>{
+    const t = setTimeout(()=>reject(new Error("timeout")), ms);
+    promise.then(v=>{ clearTimeout(t); resolve(v); },
+                 e=>{ clearTimeout(t); reject(e); });
+  });
+}
+
+/* Globally unique numeric id — safe across devices.
+   ~1.7e15 max, well inside Number.MAX_SAFE_INTEGER, stays sortable by time. */
+let _idCounter = 0;
+function newId(){
+  _idCounter = (_idCounter + 1) % 1000;
+  return Date.now() * 1000 + ((_idCounter * 7 + Math.floor(Math.random() * 1000)) % 1000);
+}
+
+/* Firestore refuses `undefined`. Strip it out and guard NaN/Infinity. */
+function sanitize(obj){
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj && typeof obj === "object"){
+    const out = {};
+    for (const k of Object.keys(obj)){
+      const v = obj[k];
+      if (v === undefined) continue;
+      out[k] = sanitize(v);
+    }
+    return out;
+  }
+  if (typeof obj === "number" && !isFinite(obj)) return 0;
+  return obj;
+}
+
+/* ═══════════════════ TOAST ═══════════════════ */
+function toast(text, kind="info", ms=3200){
+  const host = document.getElementById("toasts");
+  if (!host) return;
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.textContent = text;
+  host.appendChild(el);
+  setTimeout(()=>{
+    el.style.opacity = "0";
+    el.style.transition = "opacity .25s";
+    setTimeout(()=>el.remove(), 300);
+  }, ms);
+}
+
+/* ═══════════════════ MODAL ═══════════════════ */
+const Modal = {
+  _closeCb:null,
+  _render(html){ document.getElementById("modal").innerHTML = html; },
+  open(html, onClose){
+    this._render(html);
+    document.getElementById("modal-bg").classList.add("on");
+    this._closeCb = onClose || null;
+  },
+  close(){
+    document.getElementById("modal-bg").classList.remove("on");
+    document.getElementById("modal").innerHTML = "";
+    if (this._closeCb){ const cb = this._closeCb; this._closeCb = null; try{ cb(); }catch(e){} }
+  },
+};
+document.getElementById("modal-bg").addEventListener("click", e=>{
+  if (e.target.id === "modal-bg") Modal.close();
+});
+
+/* ═══════════════════ CRYPTO (with HTTP fallback) ═══════════════════ */
+const Crypto = {
+  _buf2hex(buf){
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  },
+  _randomSalt(){
+    try{
+      const s = crypto.getRandomValues(new Uint8Array(16));
+      return this._buf2hex(s);
+    }catch(e){
+      return Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+  },
+  _fallbackHash(password, salt){
+    const s = salt + "$" + password;
+    let h1 = 0x811c9dc5, h2 = 0xc9dc5118;
+    for (let i = 0; i < s.length; i++){
+      const c = s.charCodeAt(i);
+      h1 = ((h1 ^ c) * 16777619) >>> 0;
+      h2 = ((h2 + c) * 2654435761) >>> 0;
+    }
+    return salt + "$fb$" + h1.toString(16) + h2.toString(16);
+  },
+  async hash(password, salt=null){
+    if (!salt) salt = this._randomSalt();
+    if (!isSecureContext_() || !crypto || !crypto.subtle){
+      return this._fallbackHash(password, salt);
+    }
+    try{
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw", enc.encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+      const bits = await crypto.subtle.deriveBits(
+        { name:"PBKDF2", salt:enc.encode(salt), iterations:100_000, hash:"SHA-256" },
+        key, 256);
+      return salt + "$" + this._buf2hex(bits);
+    }catch(e){
+      console.warn("crypto.subtle failed, using fallback:", e);
+      return this._fallbackHash(password, salt);
+    }
+  },
+  async verify(password, stored){
+    try{
+      const salt = String(stored).split("$")[0];
+      const test = await this.hash(password, salt);
+      return test === stored;
+    }catch(e){ return false; }
+  },
+};
+
+/* ═══════════════════ CLOUD DATABASE (Firebase) ═══════════════════
+   Shared backend for all devices. Anonymous auth + Firestore with
+   offline persistence and real-time listeners.                      */
+const CloudDB = {
+  ready:false,
+  error:"",
+  app:null,
+  auth:null,
+  db:null,
+  uid:null,
+  _initPromise:null,
+
+  sdkAvailable(){
+    return typeof firebase !== "undefined" && firebase && firebase.initializeApp;
+  },
+
+  init(){
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._doInit();
+    return this._initPromise;
+  },
+
+  async _doInit(){
+    if (!this.sdkAvailable()){
+      this.error = "Firebase SDK not loaded (no internet on first load?)";
+      this.ready = false;
+      return false;
+    }
+    try{
+      this.app = (firebase.apps && firebase.apps.length)
+        ? firebase.app()
+        : firebase.initializeApp(FIREBASE_CONFIG);
+
+      this.auth = firebase.auth();
+      this.db   = firebase.firestore();
+
+      try{
+        await this.db.enablePersistence({ synchronizeTabs:true });
+      }catch(e){
+        console.warn("Persistence not enabled:", e && e.code);
+      }
+
+      if (!this.auth.currentUser){
+        await this.auth.signInAnonymously();
+      }
+      this.uid = this.auth.currentUser ? this.auth.currentUser.uid : null;
+
+      this.auth.onAuthStateChanged(u => {
+        this.uid = u ? u.uid : null;
+        if (!u && this.ready){
+          // token dropped — try silently again
+          this.auth.signInAnonymously().catch(()=>{});
+        }
+      });
+
+      this.ready = true;
+      this.error = "";
+      return true;
+    }catch(e){
+      this.error = (e && (e.code ? e.code + ": " : "") + (e.message || e)) || String(e);
+      this.ready = false;
+      console.warn("CloudDB init failed:", e);
+      return false;
+    }
+  },
+
+  col(key){ return this.db.collection(COLLECTIONS[key].name); },
+
+  async token(){
+    if (this.ready && this.auth && this.auth.currentUser){
+      try{ return await this.auth.currentUser.getIdToken(); }catch(e){}
+    }
+    return null;
+  },
+};
+
+/* ═══════════════════ PERSISTENCE LAYER ═══════════════════
+   Every mutation writes to the local cache AND to the shared
+   cloud database (batched through a serial queue).                 */
+const Persist = {
+  _chain: Promise.resolve(),
+
+  _queue(fn){
+    this._chain = this._chain.then(fn).catch(e=>{
+      console.warn("Persist error:", e);
+      SyncStatus.set("error", String((e && e.message) || e));
+    });
+    return this._chain;
+  },
+
+  cache(coll){ try{ STORE.set(coll, DB[coll]); }catch(e){} },
+
+  _docId(coll, rec){
+    return COLLECTIONS[coll].single ? "main" : String(rec.id);
+  },
+
+  put(coll, rec){
+    this.cache(coll);
+    if (!rec || !CloudDB.ready) return;
+    const id = this._docId(coll, rec);
+    const data = sanitize(rec);
+    this._queue(()=> CloudDB.col(coll).doc(id).set(data));
+  },
+
+  putObject(coll, obj){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    const data = sanitize(obj || {});
+    this._queue(()=> CloudDB.col(coll).doc("main").set(data));
+  },
+
+  remove(coll, id){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    this._queue(()=> CloudDB.col(coll).doc(String(id)).delete());
+  },
+
+  putAll(coll){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    if (COLLECTIONS[coll].single){ this.putObject(coll, DB[coll] || {}); return; }
+
+    const rows = Array.isArray(DB[coll]) ? DB[coll].slice() : [];
+    this._queue(async ()=>{
+      const colRef = CloudDB.col(coll);
+      let batch = CloudDB.db.batch();
+      let n = 0;
+      for (const rec of rows){
+        if (!rec || rec.id == null) continue;
+        batch.set(colRef.doc(String(rec.id)), sanitize(rec));
+        if (++n >= 400){ await batch.commit(); batch = CloudDB.db.batch(); n = 0; }
+      }
+      if (n) await batch.commit();
+    });
+  },
+
+  /* Atomic stock change — safe when several devices sell at once. */
+  adjustStock(productId, delta){
+    this.cache("products");
+    if (!CloudDB.ready) return;
+    this._queue(()=> CloudDB.col("products")
+      .doc(String(productId))
+      .set({ stock: firebase.firestore.FieldValue.increment(delta) }, { merge:true }));
+  },
+};
+
+/* ═══════════════════ SYNC STATUS PILL ═══════════════════ */
+const SyncStatus = {
+  state:"local",
+  msg:"",
+  set(state, msg){
+    this.state = state;
+    if (msg !== undefined) this.msg = msg || "";
+    this.render();
+  },
+  render(){
+    const pill = document.getElementById("cloud-pill");
+    const txt  = document.getElementById("cloud-pill-txt");
+    if (!pill || !txt) return;
+    pill.classList.remove("ok","bad","warn");
+    if (this.state === "synced"){ pill.classList.add("ok");   txt.textContent = "Synced"; }
+    else if (this.state === "error"){ pill.classList.add("bad");  txt.textContent = "Sync err"; }
+    else if (this.state === "local"){ pill.classList.add("warn"); txt.textContent = "Local"; }
+    else { pill.classList.add("warn"); txt.textContent = "Syncing"; }
+    pill.title = this.msg || txt.textContent;
+  },
+};
+
+/* ═══════════════════ REAL-TIME LISTENERS ═══════════════════ */
+const Realtime = {
+  unsubs: [],
+  started: false,
+
+  start(){
+    if (!CloudDB.ready || this.started) return;
+    this.started = true;
+    for (const coll of COLLECTION_KEYS){
+      const unsub = CloudDB.col(coll).onSnapshot(
+        snap => this.apply(coll, snap),
+        err => {
+          console.warn("snapshot error [" + coll + "]", err);
+          SyncStatus.set("error", (err && err.message) || String(err));
+        }
+      );
+      this.unsubs.push(unsub);
+    }
+    SyncStatus.set("synced", "Shared database connected");
+  },
+
+  stop(){
+    for (const u of this.unsubs){ try{ u(); }catch(e){} }
+    this.unsubs = [];
+    this.started = false;
+  },
+
+  apply(coll, snap){
+    const single = COLLECTIONS[coll].single;
+    let value;
+
+    if (single){
+      value = {};
+      snap.docs.forEach(d => { if (d.id === "main") value = d.data() || {}; });
+    } else {
+      value = snap.docs.map(d => {
+        const data = d.data() || {};
+        const n = Number(data.id);
+        return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
+      });
+    }
+
+    const before = JSON.stringify(DB[coll] || (single ? {} : []));
+    const after  = JSON.stringify(value);
+    DB[coll] = value;
+    try{ STORE.set(coll, value); }catch(e){}
+
+    if (before !== after) App.scheduleSyncRefresh();
+  },
+};
+
+/* ═══════════════════ DB (shared, cloud-backed) ═══════════════════ */
+const DB = {
+  settings:{}, users:[], categories:[], products:[], customers:[],
+  orders:[], order_items:[], expenses:[], stock_moves:[],
+
+  /* ---------- boot ---------- */
+  _hydrateLocal(){
+    this.settings    = STORE.get("settings",    {}) || {};
+    this.users       = STORE.get("users",       []) || [];
+    this.categories  = STORE.get("categories",  []) || [];
+    this.products    = STORE.get("products",    []) || [];
+    this.customers   = STORE.get("customers",   []) || [];
+    this.orders      = STORE.get("orders",      []) || [];
+    this.order_items = STORE.get("order_items", []) || [];
+    this.expenses    = STORE.get("expenses",    []) || [];
+    this.stock_moves = STORE.get("stock_moves", []) || [];
+  },
+
+  async load(onStatus){
+    const status = onStatus || function(){};
+
+    status("Loading local cache…");
+    this._hydrateLocal();
+
+    status("Connecting to shared database…");
+    const cloudOk = await CloudDB.init();
+
+    /* Cloud sync can be explicitly disabled — then we run local-only. */
+    const cloudWanted = (this.settings.firebase_enabled !== "0");
+    const useCloud = cloudOk && cloudWanted;
+
+    let firstTime = true;
+    let cloudReachable = false;
+
+    if (useCloud){
+      status("Downloading shared data…");
+      try{
+        const res = await withTimeout(this._fetchCloud(), 15000);
+        firstTime = res.usersEmpty;
+        cloudReachable = true;
+      }catch(e){
+        console.warn("Initial cloud fetch failed:", e);
+        CloudDB.error = (e && e.message) || String(e);
+        firstTime = false;                 // don't push, avoid clobbering
+        SyncStatus.set("error", CloudDB.error);
+      }
+    } else {
+      firstTime = !this.users.length;
+      if (cloudOk && !cloudWanted) SyncStatus.set("local", "Cloud sync disabled in Settings");
+      else if (!cloudOk) SyncStatus.set("local", CloudDB.error || "Offline — local data only");
+    }
+
+    if (firstTime){
+      if (!this.users.length){ status("Seeding default data…"); await this._seed(); }
+      this._migrations();
+      this.saveAll();
+      if (useCloud && cloudReachable){
+        status("Uploading to shared database…");
+        this.pushAllToCloud();
+      }
+    } else {
+      this._migrations();
+      this.saveAll();
+    }
+
+    if (useCloud && cloudReachable){
+      Realtime.start();
+      SyncStatus.set("synced", "Shared database connected · device " + (CloudDB.uid || "").slice(0,6));
+    }
+    status("");
+  },
+
+  /* Pull every shared collection once (used during boot). */
+  async _fetchCloud(){
+    const snaps = await Promise.all(
+      COLLECTION_KEYS.map(k => CloudDB.col(k).get())
+    );
+    const map = {};
+    COLLECTION_KEYS.forEach((k, i) => { map[k] = snaps[i]; });
+
+    const usersEmpty = map.users.empty;
+
+    if (!usersEmpty){
+      const arr = snap => snap.docs.map(d => {
+        const data = d.data() || {};
+        const n = Number(data.id);
+        return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
+      });
+      this.users       = arr(map.users);
+      this.categories  = arr(map.categories);
+      this.products    = arr(map.products);
+      this.customers   = arr(map.customers);
+      this.orders      = arr(map.orders);
+      this.order_items = arr(map.order_items);
+      this.expenses    = arr(map.expenses);
+      this.stock_moves = arr(map.stock_moves);
+
+      let s = {};
+      map.settings.docs.forEach(d => { if (d.id === "main") s = d.data() || {}; });
+      this.settings = s;
+    }
+    return { usersEmpty };
+  },
+
+  pushAllToCloud(){
+    for (const coll of COLLECTION_KEYS){
+      if (COLLECTIONS[coll].single) Persist.putObject(coll, this[coll] || {});
+      else Persist.putAll(coll);
+    }
+  },
+
+  saveAll(){
+    for (const coll of COLLECTION_KEYS){
+      try{ STORE.set(coll, this[coll]); }catch(e){}
+    }
+  },
+  save(key){ try{ STORE.set(key, this[key]); }catch(e){} },
+
+  async _seed(){
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, this.settings);
+    this.settings.options_v2 = "1";
+    this.settings.bbq_v1 = "1";
+    this.settings.extras_v1 = "1";
+    this.settings.extras_v2 = "1";
+    try{
+      const opts = JSON.parse(this.settings.product_options);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+    }catch(e){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+    }
+
+    if (!this.users.length){
+      const hash = await Crypto.hash("admin123");
+      this.users = [{
+        id:newId(), username:"admin", password:hash,
+        full_name:"Administrator", role:"manager", active:1,
+        created_at: nowIso(),
+      }];
+    }
+
+    if (!this.categories.length){
+      this.categories = SEED_CATEGORIES.map((n,i)=>({ id:newId(), name:n, sort_order:i }));
+    }
+
+    if (!this.products.length){
+      this.products = [];
+      for (const [n,e,c,p,co,s,t,o] of SEED_PRODUCTS){
+        const cat = this.categories.find(x=>x.name === c);
+        const custom = CUSTOM_OPTIONS[n] ? JSON.stringify(CUSTOM_OPTIONS[n]) : "";
+        this.products.push({
+          id:newId(),
+          name:n, emoji:e, category_id:cat ? cat.id : null,
+          price:p, cost:co, stock:s, track_stock:t,
+          low_stock: Number(this.settings.low_stock_default)||5,
+          has_options:o, active:1,
+          size_prices:"", custom_options:custom,
+        });
+      }
+    }
+  },
+
+  _migrations(){
+    let changed = false;
+
+    if (this.settings.options_v2 !== "1"){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+      this.settings.options_v2 = "1";
+      changed = true;
+    }
+    if (this.settings.extras_v1 !== "1"){
+      let opts = null;
+      try{ opts = JSON.parse(this.settings.product_options); }catch(e){ opts = null; }
+      if (!Array.isArray(opts) || !opts.length) opts = cloneJson(DEFAULT_OPTIONS);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+      this.settings.extras_v1 = "1";
+      changed = true;
+    }
+    if (this.settings.extras_v2 !== "1"){
+      let opts = null;
+      try{ opts = JSON.parse(this.settings.product_options); }catch(e){ opts = null; }
+      if (!Array.isArray(opts) || !opts.length) opts = cloneJson(DEFAULT_OPTIONS);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+      this.settings.extras_v2 = "1";
+      changed = true;
+    }
+    if (this.settings.bbq_v1 !== "1"){
+      const bbq = this.products.find(x=>x.name === "Chicken BBQ Pizza");
+      if (bbq){ bbq.price = 1200000; bbq.has_options = 0; bbq.custom_options = ""; bbq.size_prices = ""; }
+      this.settings.bbq_v1 = "1";
+      changed = true;
+    }
+
+    /* ── Pizza-first migration ─────────────────────────────────────
+       Guarantee the "Pizza" category always owns the lowest
+       sort_order and that every pizza product is flagged active, so
+       the POS grid, the category bar and the products table all show
+       pizza at the very top on every device.                        */
+    if (this.settings.order_v1 !== "1"){
+      const pizza = this.categories.find(c =>
+        String(c.name||"").trim().toLowerCase() === "pizza");
+      if (pizza){
+        const others = this.categories
+          .filter(c => c.id !== pizza.id)
+          .sort((a,b)=> (Number(a.sort_order)||99) - (Number(b.sort_order)||99));
+        pizza.sort_order = 0;
+        others.forEach((c,i)=>{ c.sort_order = i + 1; });
+        for (const c of this.categories) Persist.put("categories", c);
+      }
+      this.settings.order_v1 = "1";
+      changed = true;
+    }
+
+    for (const k in DEFAULT_SETTINGS){
+      if (!(k in this.settings)){ this.settings[k] = DEFAULT_SETTINGS[k]; changed = true; }
+    }
+    try{
+      const opts = JSON.parse(this.settings.product_options);
+      const res = ensureExtrasGroup(opts);
+      if (res.changed){
+        this.settings.product_options = JSON.stringify(res.groups);
+        changed = true;
+      }
+    }catch(e){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+      changed = true;
+    }
+    for (const p of this.products){
+      const c = CUSTOM_OPTIONS[p.name];
+      if (c && !p.custom_options){ p.custom_options = JSON.stringify(c); p.has_options = 1; p.price = 0; changed = true; }
+    }
+    if (changed){
+      try{ STORE.set("settings", this.settings); STORE.set("products", this.products); }catch(e){}
+    }
+    return changed;
+  },
+
+  /* ---------- categories ---------- */
+  /* Pizza is always first, then the rest by sort_order, then name. */
+  categoriesSorted(){
+    const isPizza = c => String((c && c.name) || "").trim().toLowerCase() === "pizza";
+    return [...this.categories].sort((a,b)=>{
+      const pa = isPizza(a) ? -1 : 0;
+      const pb = isPizza(b) ? -1 : 0;
+      if (pa !== pb) return pa - pb;
+      const sa = Number(a.sort_order), sb = Number(b.sort_order);
+      const oa = Number.isFinite(sa) ? sa : 99;
+      const ob = Number.isFinite(sb) ? sb : 99;
+      if (oa !== ob) return oa - ob;
+      return String(a.name||"").localeCompare(String(b.name||""));
+    });
+  },
+  saveCategory(data, id){
+    if (id){
+      const c = this.categories.find(x=>x.id === id);
+      if (c){ Object.assign(c, data); Persist.put("categories", c); }
+      return id;
+    }
+    const c = Object.assign({ id:newId(), sort_order:99 }, data);
+    this.categories.push(c);
+    Persist.put("categories", c);
+    return c.id;
+  },
+
+  /* ---------- products ---------- */
+  /* Sort: pizza category first → other categories by sort_order →
+     products inside a category by creation id (stable everywhere).  */
+  sortProducts(list){
+    const rank = new Map();
+    this.categoriesSorted().forEach((c,i)=> rank.set(c.id, i));
+    return list.slice().sort((a,b)=>{
+      const ra = rank.has(a.category_id) ? rank.get(a.category_id) : 9000;
+      const rb = rank.has(b.category_id) ? rank.get(b.category_id) : 9000;
+      if (ra !== rb) return ra - rb;
+      const ia = Number(a.id), ib = Number(b.id);
+      if (Number.isFinite(ia) && Number.isFinite(ib) && ia !== ib) return ia - ib;
+      return String(a.name||"").localeCompare(String(b.name||""));
+    });
+  },
+  productsList({search="", category_id=null, only_active=true}={}){
+    const s = (search||"").toLowerCase();
+    const list = this.products.filter(p=>{
+      if (only_active && !p.active) return false;
+      if (category_id && p.category_id !== category_id) return false;
+      if (s){
+        const c = this.categories.find(x=>x.id === p.category_id);
+        const inName = String(p.name||"").toLowerCase().includes(s);
+        const inCat  = c ? String(c.name||"").toLowerCase().includes(s) : false;
+        if (!inName && !inCat) return false;
+      }
+      return true;
+    });
+    return this.sortProducts(list);
+  },
+  getProduct(id){ return this.products.find(p=>p.id === id); },
+  saveProduct(data, id){
+    if (id){
+      const p = this.getProduct(id);
+      if (p){ Object.assign(p, data); Persist.put("products", p); }
+      return id;
+    }
+    const p = Object.assign(
+      { id:newId(), active:1, size_prices:"", custom_options:"" }, data);
+    this.products.push(p);
+    Persist.put("products", p);
+    return p.id;
+  },
+  deleteProduct(id){
+    this.products = this.products.filter(p=>p.id !== id);
+    Persist.remove("products", id);
+  },
+
+  /* ---------- customers ---------- */
+  customersList(search=""){
+    const s = (search||"").toLowerCase();
+    return [...this.customers]
+      .filter(c => !s || String(c.name||"").toLowerCase().includes(s) || String(c.phone||"").toLowerCase().includes(s))
+      .sort((a,b)=> String(a.name||"").localeCompare(String(b.name||"")));
+  },
+  saveCustomer(data, id){
+    if (id){
+      const c = this.customers.find(x=>x.id === id);
+      if (c){ Object.assign(c, data); Persist.put("customers", c); }
+      return id;
+    }
+    const c = Object.assign({ id:newId(), points:0, created_at: nowIso() }, data);
+    this.customers.push(c);
+    Persist.put("customers", c);
+    return c.id;
+  },
+  deleteCustomer(id){
+    this.customers = this.customers.filter(c=>c.id !== id);
+    Persist.remove("customers", id);
+  },
+
+  /* ---------- orders ---------- */
+  nextOrderNo(){
+    const d = new Date();
+    const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+    const pref = `ORD-${day}-`;
+    let n = 0;
+    for (const o of this.orders){ if (o.order_no && o.order_no.startsWith(pref)) n++; }
+    return pref + String(n+1).padStart(4,"0");
+  },
+  _freeOrderNo(no){
+    if (!this.orders.some(o => o.order_no === no)) return no;
+    const m = /^(.*-)(\d+)$/.exec(no);
+    if (!m) return no + "-" + String(Math.floor(Math.random()*90+10));
+    const base = m[1];
+    let num = parseInt(m[2], 10);
+    let candidate = no;
+    let guard = 0;
+    do {
+      num++;
+      candidate = base + String(num).padStart(4,"0");
+      guard++;
+    } while (this.orders.some(o => o.order_no === candidate) && guard < 9999);
+    return candidate;
+  },
+  openOrders(){
+    return this.orders
+      .filter(o => o.status === "open")
+      .map(o => Object.assign({}, o, {
+        items: this.order_items.filter(i => i.order_id === o.id),
+      }));
+  },
+  saveOrder(o, status="open"){
+    const now = nowIso();
+    let oid = o.id;
+    let row;
+
+    if (oid){
+      row = this.orders.find(x=>x.id === oid);
+      if (row){
+        Object.assign(row, {
+          order_type:o.type, status,
+          customer_id:o.customer_id, customer_name:o.customer_name||"",
+          customer_phone:o.customer_phone||"",
+          subtotal:o.subtotal, discount:o.discount, tax:o.tax,
+          delivery:o.delivery, total:o.total,
+          payment_method:o.payment_method||"Cash",
+          user_id:o.user_id, note:o.note||"",
+        });
+      }
+      /* wipe this order's old lines, then re-add */
+      const old = this.order_items.filter(i=>i.order_id === oid);
+      this.order_items = this.order_items.filter(i=>i.order_id !== oid);
+      for (const it of old) Persist.remove("order_items", it.id);
+      if (row) Persist.put("orders", row);
+    } else {
+      oid = newId();
+      const no = this._freeOrderNo(o.no);
+      o.no = no;
+      row = {
+        id:oid, order_no:no, order_type:o.type||"Delivery", status,
+        customer_id:o.customer_id||null, customer_name:o.customer_name||"",
+        customer_phone:o.customer_phone||"",
+        subtotal:o.subtotal, discount:o.discount, tax:o.tax,
+        delivery:o.delivery, total:o.total,
+        payment_method:o.payment_method||"Cash",
+        user_id:o.user_id||null, note:o.note||"",
+        created_at:now, closed_at:null,
+      };
+      this.orders.push(row);
+      o.id = oid;
+      Persist.put("orders", row);
+    }
+
+    for (const it of o.items){
+      const item = {
+        id:newId(),
+        order_id: oid, product_id: it.product_id, name: it.name,
+        qty: it.qty, unit_price: it.unit,
+        options: (it.options||[]).map(x=>x.label).join(", "),
+        note: it.note||"",
+        line_total: it.line,
+      };
+      this.order_items.push(item);
+      Persist.put("order_items", item);
+    }
+
+    if (status === "paid"){
+      const r = this.orders.find(x=>x.id === oid);
+      if (r){ r.closed_at = now; Persist.put("orders", r); }
+    }
+    return oid;
+  },
+  deductStock(o){
+    for (const it of o.items){
+      const p = this.getProduct(it.product_id);
+      if (p && p.track_stock){
+        p.stock = Number(p.stock||0) - Number(it.qty||0);
+        const mv = {
+          id:newId(), product_id:p.id,
+          change:-it.qty, reason:"Order " + o.no, created_at: nowIso(),
+        };
+        this.stock_moves.push(mv);
+        Persist.put("stock_moves", mv);
+        Persist.adjustStock(p.id, -Number(it.qty||0));
+      }
+    }
+  },
+
+  /* ---------- expenses ---------- */
+  expensesList(){
+    return [...this.expenses].sort((a,b)=>
+      String(b.spent_on||"").localeCompare(String(a.spent_on||"")) || (b.id - a.id));
+  },
+  saveExpense(data, id){
+    if (id){
+      const e = this.expenses.find(x=>x.id === id);
+      if (e){ Object.assign(e, data); Persist.put("expenses", e); }
+      return id;
+    }
+    const e = Object.assign({ id:newId(), created_at: nowIso() }, data);
+    this.expenses.push(e);
+    Persist.put("expenses", e);
+    return e.id;
+  },
+  deleteExpense(id){
+    this.expenses = this.expenses.filter(e=>e.id !== id);
+    Persist.remove("expenses", id);
+  },
+
+  /* ---------- reports ---------- */
+  _paidOrdersInRange(s, e){
+    return this.orders.filter(o =>
+      o.status === "paid" &&
+      (o.created_at||"").slice(0,10) >= s &&
+      (o.created_at||"").slice(0,10) <= e);
+  },
+  summary(s, e){
+    const os = this._paidOrdersInRange(s, e);
+    const exp = this.expenses.filter(x =>
+      (x.spent_on||"") >= s && (x.spent_on||"") <= e);
+    return {
+      orders:   os.length,
+      revenue:  os.reduce((a,o)=>a + Number(o.total||0), 0),
+      discount: os.reduce((a,o)=>a + Number(o.discount||0), 0),
+      tax:      os.reduce((a,o)=>a + Number(o.tax||0), 0),
+      expenses: exp.reduce((a,x)=>a + Number(x.amount||0), 0),
+    };
+  },
+  topProducts(s, e){
+    const os = this._paidOrdersInRange(s, e);
+    const ids = new Set(os.map(o=>o.id));
+    const map = new Map();
+    for (const it of this.order_items){
+      if (!ids.has(it.order_id)) continue;
+      const k = it.name;
+      if (!map.has(k)) map.set(k, { name:k, qty:0, revenue:0 });
+      const r = map.get(k);
+      r.qty += Number(it.qty||0);
+      r.revenue += Number(it.line_total||0);
+    }
+    return [...map.values()].sort((a,b)=>b.revenue - a.revenue).slice(0,10);
+  },
+  salesByCategory(s, e){
+    const os = this._paidOrdersInRange(s, e);
+    const ids = new Set(os.map(o=>o.id));
+    const map = new Map();
+    for (const it of this.order_items){
+      if (!ids.has(it.order_id)) continue;
+      const p = this.getProduct(it.product_id);
+      const c = p ? this.categories.find(x=>x.id === p.category_id) : null;
+      const k = c ? c.name : "Other";
+      map.set(k, (map.get(k)||0) + Number(it.line_total||0));
+    }
+    return [...map.entries()].map(([category, revenue])=>({category, revenue}))
+      .sort((a,b)=>b.revenue - a.revenue);
+  },
+  salesByMethod(s, e){
+    const os = this._paidOrdersInRange(s, e);
+    const map = new Map();
+    for (const o of os){
+      const k = o.payment_method || "Cash";
+      if (!map.has(k)) map.set(k, { method:k, c:0, revenue:0 });
+      const r = map.get(k);
+      r.c++; r.revenue += Number(o.total||0);
+    }
+    return [...map.values()];
+  },
+  salesByDay(s, e){
+    const os = this._paidOrdersInRange(s, e);
+    const map = new Map();
+    for (const o of os){
+      const d = (o.created_at||"").slice(0,10);
+      if (!map.has(d)) map.set(d, { day:d, orders:0, revenue:0 });
+      const r = map.get(d);
+      r.orders++; r.revenue += Number(o.total||0);
+    }
+    return [...map.values()].sort((a,b)=>b.day.localeCompare(a.day));
+  },
+  cashSummary(s, e){
+    const os = this._paidOrdersInRange(s, e).filter(o=>o.payment_method === "Cash");
+    const exp = this.expenses.filter(x =>
+      (x.spent_on||"") >= s && (x.spent_on||"") <= e);
+    const cash_sales = os.reduce((a,o)=>a + Number(o.total||0), 0);
+    const expenses   = exp.reduce((a,x)=>a + Number(x.amount||0), 0);
+    return { cash_orders: os.length, cash_sales, expenses, expected: cash_sales - expenses };
+  },
+
+  /* ---------- users ---------- */
+  async authenticate(u, p){
+    const user = this.users.find(x=>x.username === u && x.active);
+    if (!user) return null;
+    const ok = await Crypto.verify(p, user.password);
+    return ok ? user : null;
+  },
+  async addUser(u, p, n, r){
+    if (this.users.some(x=>x.username === u)) throw new Error("exists");
+    const hash = await Crypto.hash(p);
+    const rec = {
+      id:newId(), username:u, password:hash,
+      full_name:n, role:r, active:1, created_at: nowIso(),
+    };
+    this.users.push(rec);
+    Persist.put("users", rec);
+  },
+  deleteUser(id){
+    const u = this.users.find(x=>x.id === id);
+    if (u && u.username !== "admin"){
+      this.users = this.users.filter(x=>x.id !== id);
+      Persist.remove("users", id);
+    }
+  },
+};
+
+/* ═══════════════════ OPTIONS ═══════════════════ */
+function ensureExtrasGroup(groups){
+  let changed = false;
+  if (!Array.isArray(groups)){ groups = []; changed = true; }
+  let grp = null;
+  for (const g of groups){ if (g && g.name === EXTRAS_GROUP_NAME){ grp = g; break; } }
+  if (!grp){ grp = { name:EXTRAS_GROUP_NAME, multi:true, choices:[] }; groups.push(grp); changed = true; }
+  if (grp.multi !== true){ grp.multi = true; changed = true; }
+  if (grp.large_only){ grp.large_only = false; changed = true; }
+  if (!Array.isArray(grp.choices)){ grp.choices = []; changed = true; }
+  for (const c of EXTRAS_CHOICES){
+    const ex = grp.choices.find(x => x && x.label === c.label);
+    if (!ex){ grp.choices.push({ label:c.label, price:0 }); changed = true; }
+    else if (Number(ex.price) !== 0){ ex.price = 0; changed = true; }
+  }
+  return { groups, changed };
+}
+function computeUnitPrice(product, chosenOptions){
+  let total = Number(product.price) || 0;
+  for (const o of chosenOptions) total += Number(o.price) || 0;
+  const labels = new Set(chosenOptions.map(o=>(o.label||"").toLowerCase()));
+  const name = (product.name||"").toLowerCase();
+  const isLarge = labels.has("large");
+  const hasBBQ  = [...labels].some(l => l.includes("bbq") || l.includes("barbecue"));
+  const productIsBBQ = name.includes("bbq") || name.includes("barbecue");
+  if (isLarge && (hasBBQ || productIsBBQ)) total = CHICKEN_BBQ_LARGE_PRICE;
+  return total;
+}
+function optionsFor(product){
+  if (product && product.custom_options){
+    try{
+      const parsed = JSON.parse(product.custom_options);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }catch(e){}
+  }
+  let groups = null;
+  try{ groups = JSON.parse(DB.settings.product_options); }catch(e){ groups = null; }
+  if (!Array.isArray(groups) || !groups.length) groups = cloneJson(DEFAULT_OPTIONS);
+  const res = ensureExtrasGroup(groups);
+  if (res.changed){
+    try{
+      DB.settings.product_options = JSON.stringify(res.groups);
+      DB.save("settings");
+      Persist.putObject("settings", DB.settings);
+    }catch(e){}
+  }
+  return res.groups;
+}
+
+/* ═══════════════════ ESC/POS ═══════════════════ */
+class EscPos {
+  constructor(){ this.buf = []; }
+  _u8(...b){ for (const x of b) this.buf.push(x & 0xFF); return this; }
+  init(){ return this._u8(0x1B, 0x40); }
+  align(n){ return this._u8(0x1B, 0x61, n & 3); }
+  bold(on){ return this._u8(0x1B, 0x45, on ? 1 : 0); }
+  size(w, h){ return this._u8(0x1D, 0x21, ((w & 7) << 4) | (h & 7)); }
+  text(s){
+    for (const ch of String(s)){
+      const code = ch.charCodeAt(0);
+      if (code === 0x09){ this.buf.push(0x09); continue; }
+      if (code < 0x80) this.buf.push(code);
+      else if (code < 0x100) this.buf.push(code);
+      else this.buf.push(0x3F);
+    }
+    return this;
+  }
+  line(s=""){ return this.text(s)._u8(0x0A); }
+  feed(n=1){ return this._u8(0x1B, 0x64, n & 0xFF); }
+  cut(mode="partial"){
+    this.feed(4);
+    if (mode === "full")    return this._u8(0x1D, 0x56, 0x00);
+    if (mode === "partial") return this._u8(0x1D, 0x56, 0x42, 0x00);
+    return this;
+  }
+  kickDrawer(){ return this._u8(0x1B, 0x70, 0x00, 0x19, 0xFA); }
+  bytes(){ return new Uint8Array(this.buf); }
+}
+
+/* ═══════════════════ USB PRINTER ═══════════════════ */
+const USBPrinter = {
+  device: null,
+  endpoint: null,
+  ifaceNum: 0,
+  _busy: false,
+
+  isSupported(){ return typeof navigator !== "undefined" && "usb" in navigator; },
+  isConnected(){ return !!(this.device && this.endpoint !== null); },
+
+  async connect(){
+    if (!this.isSupported()) throw new Error("WebUSB not supported in this browser (use Chrome or Edge on desktop)");
+    if (!isSecureContext_()) throw new Error("WebUSB requires HTTPS or localhost");
+    let dev = null;
+    try{
+      const known = await navigator.usb.getDevices();
+      if (known && known.length) dev = known[0];
+    }catch(e){}
+    if (!dev){
+      dev = await navigator.usb.requestDevice({ filters:[
+        { classCode:7 }, { classCode:0xFF }, {}
+      ]});
+    }
+    try{
+      await dev.open();
+    }catch(e){
+      if (!String(e.message||"").match(/already open/i)) throw e;
+    }
+    if (dev.configuration === null) await dev.selectConfiguration(1);
+
+    let epNum = null, ifaceNum = 0;
+    for (const i of dev.configuration.interfaces){
+      for (const alt of i.alternates){
+        for (const e of alt.endpoints){
+          if (e.direction === "out" && (e.type === "bulk" || e.type === "interrupt")){
+            epNum = e.endpointNumber; ifaceNum = i.interfaceNumber; break;
+          }
+        }
+        if (epNum !== null) break;
+      }
+      if (epNum !== null) break;
+    }
+    if (epNum === null){
+      try{ await dev.close(); }catch(e){}
+      throw new Error("No OUT endpoint on this device — is it a printer?");
+    }
+    try{ await dev.claimInterface(ifaceNum); }catch(e){}
+
+    this.device = dev;
+    this.endpoint = epNum;
+    this.ifaceNum = ifaceNum;
+    STORE.set("usb_printer", { vid: dev.vendorId, pid: dev.productId });
+    return { vid: dev.vendorId, pid: dev.productId };
+  },
+
+  async disconnect(){
+    try{ if (this.device) await this.device.close(); }catch(e){}
+    this.device = null; this.endpoint = null;
+  },
+
+  async send(bytes){
+    if (!this.isConnected()) throw new Error("USB printer not connected");
+    if (this._busy) throw new Error("USB printer busy");
+    this._busy = true;
+    try{
+      const CHUNK = 4096;
+      for (let i = 0; i < bytes.length; i += CHUNK){
+        const slice = bytes.slice(i, Math.min(i + CHUNK, bytes.length));
+        const res = await this.device.transferOut(this.endpoint, slice);
+        if (res && res.status && res.status !== "ok"){
+          throw new Error("USB transfer " + res.status);
+        }
+      }
+    } finally {
+      this._busy = false;
+    }
+  },
+};
+
+/* ═══════════════════ RECEIPT BUILDERS ═══════════════════ */
+const RECEIPT_WIDTH = 42;
+function center(s, w=RECEIPT_WIDTH){
+  s = String(s);
+  if (s.length >= w) return s;
+  return " ".repeat(Math.floor((w - s.length)/2)) + s;
+}
+function lr(left, right, w=RECEIPT_WIDTH){
+  left = String(left); right = String(right);
+  let gap = w - left.length - right.length;
+  if (gap < 1) gap = 1;
+  return left + " ".repeat(gap) + right;
+}
+function sep(ch="-", w=RECEIPT_WIDTH){ return ch.repeat(w); }
+
+function buildReceiptText(order, settings, copyLabel=""){
+  const sym = settings.currency_symbol || "LBP ";
+  const lines = [];
+  if (settings.restaurant_name) lines.push(center(settings.restaurant_name));
+  if (settings.tagline) lines.push(center(settings.tagline));
+  if (settings.address) lines.push(center(settings.address));
+  if (settings.phone)   lines.push(center(settings.phone));
+  lines.push(sep("-"));
+  if (copyLabel){
+    lines.push(center("*** " + copyLabel + " ***"));
+    lines.push(sep("-"));
+  }
+  const when = new Date().toLocaleString([], { hour12:false });
+  lines.push(lr("Order: " + order.no, when));
+  if (order.customer_name) lines.push("Customer: " + order.customer_name);
+  if (order.customer_phone) lines.push("Phone: " + order.customer_phone);
+  lines.push("Type: " + (order.type || "Delivery"));
+  lines.push(sep("-"));
+  for (const it of order.items){
+    lines.push(it.name);
+    const opts = (it.options||[]).map(o=>o.label).join(", ");
+    if (opts) lines.push("  " + opts);
+    if (it.note) lines.push("  Note: " + it.note);
+    lines.push(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym), fmtMoney(it.line, sym)));
+  }
+  lines.push(sep("-"));
+  lines.push(lr("Subtotal", fmtMoney(order.subtotal, sym)));
+  if (order.discount) lines.push(lr("Discount", "-" + fmtMoney(order.discount, sym)));
+  if (order.delivery) lines.push(lr("Delivery", fmtMoney(order.delivery, sym)));
+  lines.push(sep("="));
+  lines.push(lr("TOTAL", fmtMoney(order.total, sym)));
+  const rate = Number(settings.secondary_rate)||90000;
+  const sec  = (settings.secondary_currency||"USD").toUpperCase();
+  const secSym = sec === "USD" ? "$" : sec + " ";
+  if (rate) lines.push(center(secSym + (Number(order.total)/rate).toFixed(2) + "  @ " + rate.toFixed(0)));
+  lines.push(sep("="));
+  lines.push(lr("Payment", order.payment_method || "Cash"));
+  lines.push(sep("-"));
+  if (settings.receipt_footer) lines.push(center(settings.receipt_footer));
+  lines.push(""); lines.push("");
+  return lines.join("\n");
+}
+
+function buildEscPosReceipt(order, settings, copyLabel){
+  const sym = settings.currency_symbol || "LBP ";
+  const p = new EscPos();
+  p.init();
+  p.align(1);
+  if (settings.restaurant_name){
+    p.size(1,1); p.bold(true);
+    p.line(settings.restaurant_name);
+    p.size(0,0); p.bold(false);
+  }
+  if (settings.tagline) p.line(settings.tagline);
+  if (settings.address) p.line(settings.address);
+  if (settings.phone)   p.line(settings.phone);
+  p.align(0);
+  p.line(sep("-"));
+  if (copyLabel){
+    p.align(1); p.bold(true);
+    p.line("*** " + copyLabel + " ***");
+    p.bold(false); p.align(0);
+    p.line(sep("-"));
+  }
+  const when = new Date().toLocaleString([], { hour12:false });
+  p.line(lr("Order: " + order.no, when));
+  if (order.customer_name) p.line("Customer: " + order.customer_name);
+  if (order.customer_phone) p.line("Phone: " + order.customer_phone);
+  p.line("Type: " + (order.type || "Delivery"));
+  p.line(sep("-"));
+  for (const it of order.items){
+    p.line(it.name);
+    const opts = (it.options||[]).map(o=>o.label).join(", ");
+    if (opts) p.line("  " + opts);
+    if (it.note) p.line("  Note: " + it.note);
+    p.line(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym), fmtMoney(it.line, sym)));
+  }
+  p.line(sep("-"));
+  p.line(lr("Subtotal", fmtMoney(order.subtotal, sym)));
+  if (order.discount) p.line(lr("Discount", "-" + fmtMoney(order.discount, sym)));
+  if (order.delivery) p.line(lr("Delivery", fmtMoney(order.delivery, sym)));
+  p.line(sep("="));
+  p.bold(true); p.size(1,1);
+  p.line(lr("TOTAL", fmtMoney(order.total, sym)));
+  p.size(0,0); p.bold(false);
+  const rate = Number(settings.secondary_rate)||90000;
+  const sec  = (settings.secondary_currency||"USD").toUpperCase();
+  const secSym = sec === "USD" ? "$" : sec + " ";
+  if (rate){
+    p.align(1);
+    p.line(secSym + (Number(order.total)/rate).toFixed(2) + "  @ " + rate.toFixed(0));
+    p.align(0);
+  }
+  p.line(sep("="));
+  p.line(lr("Payment", order.payment_method || "Cash"));
+  p.line(sep("-"));
+  if (settings.receipt_footer){
+    p.align(1); p.line(settings.receipt_footer); p.align(0);
+  }
+  if (settings.printer_drawer === "1") p.kickDrawer();
+  p.cut(settings.printer_cut || "partial");
+  return p.bytes();
+}
+
+function buildCloseCashText(start, end, settings){
+  const sym = settings.currency_symbol || "LBP ";
+  const cash = DB.cashSummary(start, end);
+  const lines = [];
+  lines.push(center(settings.restaurant_name || "Pizza POS"));
+  lines.push(center("CLOSE CASH REPORT"));
+  lines.push(sep("="));
+  lines.push(center(start + "  ->  " + end));
+  lines.push(sep("-"));
+  lines.push(lr("Cash orders", String(cash.cash_orders)));
+  lines.push(lr("Cash sales",  fmtMoney(cash.cash_sales, sym)));
+  lines.push(lr("Expenses",    fmtMoney(cash.expenses, sym)));
+  lines.push(sep("="));
+  lines.push(lr("EXPECTED DRAWER", fmtMoney(cash.expected, sym)));
+  const rate = Number(settings.secondary_rate)||90000;
+  const sec  = (settings.secondary_currency||"USD").toUpperCase();
+  const secSym = sec === "USD" ? "$" : sec + " ";
+  if (rate) lines.push(center(secSym + (cash.expected/rate).toFixed(2) + "  @ " + rate.toFixed(0)));
+  lines.push(sep("="));
+  lines.push("");
+  lines.push(lr("Opened by", "________________"));
+  lines.push(lr("Closed by", "________________"));
+  lines.push(lr("Signature", "________________"));
+  lines.push("");
+  lines.push(center(new Date().toLocaleString([], { hour12:false })));
+  return lines.join("\n");
+}
+
+/* ═══════════════════ UNIFIED PRINTER ═══════════════════ */
+const Printer = {
+  copies(settings){
+    const n = Number(settings.printer_copies || 2);
+    return Math.max(1, Math.min(3, n));
+  },
+
+  async print(order, settings){
+    const mode = (settings.printer_mode || "browser").toLowerCase();
+    const copies = this.copies(settings);
+    const jobs = [];
+    for (let i = 0; i < copies; i++){
+      const label = i === 0 ? "CUSTOMER COPY" : "RESTAURANT COPY";
+      jobs.push({ label, bytes: buildEscPosReceipt(order, settings, label) });
+    }
+    switch (mode){
+      case "usb":   return await this._usb(jobs, order, settings);
+      case "agent": return await this._agent(jobs, order, settings);
+      case "cloud": return await this._cloud(jobs, order, settings);
+      default:      return await this._browser(order, settings);
+    }
+  },
+
+  async _usb(jobs, order, settings){
+    if (!USBPrinter.isSupported()){
+      toast("WebUSB not supported — use Chrome/Edge on desktop, over HTTPS or localhost.", "error", 6000);
+      return { ok:false, error:"usb unsupported" };
+    }
+    if (!USBPrinter.isConnected()){
+      toast("USB printer not connected — Settings → Connect USB printer.", "warning", 5000);
+      return { ok:false, error:"usb not connected" };
+    }
+    try{
+      for (const job of jobs){
+        await USBPrinter.send(job.bytes);
+        await new Promise(r => setTimeout(r, 300));
+      }
+      toast(`🖨  Printed ${jobs.length} ${jobs.length===1?"copy":"copies"} (USB)`, "success");
+      return { ok:true };
+    }catch(e){
+      toast("USB print failed: " + e.message, "error", 6000);
+      return { ok:false, error:e.message };
+    }
+  },
+
+  async _agent(jobs, order, settings){
+    const url = (settings.printer_agent_url || "").trim();
+    if (!url){
+      toast("Set the Print Agent URL in Settings → Printer.", "warning", 5000);
+      return { ok:false, error:"no agent url" };
+    }
+    if (!isSecureContext_()){
+      toast("Agent printing over HTTP requires HTTPS page (or localhost).", "error", 7000);
+      return { ok:false, error:"not secure context" };
+    }
+    try{
+      const headers = { "Content-Type":"application/json" };
+      if (settings.printer_agent_token) headers["X-Auth-Token"] = settings.printer_agent_token;
+      const body = {
+        printer: settings.printer_name || "",
+        order_no: order.no || "",
+        cut:     settings.printer_cut || "partial",
+        drawer:  settings.printer_drawer === "1",
+        jobs: jobs.map(j => ({ label: j.label, data: Array.from(j.bytes) })),
+      };
+      const r = await fetch(url.replace(/\/+$/,"") + "/print", {
+        method:"POST", headers, body: JSON.stringify(body),
+      });
+      if (!r.ok){
+        const t = await r.text().catch(()=> "");
+        throw new Error("HTTP " + r.status + (t ? " " + t.slice(0,140) : ""));
+      }
+      toast(`🖨  Sent ${jobs.length} ${jobs.length===1?"copy":"copies"} to agent`, "success");
+      return { ok:true };
+    }catch(e){
+      toast("Print agent failed: " + e.message, "error", 6000);
+      return { ok:false, error:e.message };
+    }
+  },
+
+  async _cloud(jobs, order, settings){
+    if (settings.firebase_enabled !== "1"){
+      toast("Cloud print needs Firebase enabled (Settings → Cloud).", "warning", 5000);
+      return { ok:false, error:"firebase disabled" };
+    }
+    try{
+      const all = [];
+      for (const j of jobs) for (const b of j.bytes) all.push(b);
+      await CloudSync.queuePrintJob({
+        printer_name: settings.printer_name || "",
+        order_no: order.no || "",
+        cut: settings.printer_cut || "partial",
+        drawer: settings.printer_drawer === "1",
+        copies: jobs.length,
+        data: all,
+      });
+      toast("☁  Print job queued — store agent will print it", "success");
+      return { ok:true };
+    }catch(e){
+      toast("Cloud print failed: " + e.message, "error", 6000);
+      return { ok:false, error:e.message };
+    }
+  },
+
+  async _browser(order, settings){
+    const copies = this.copies(settings);
+    const blocks = [];
+    for (let i = 0; i < copies; i++){
+      const label = i === 0 ? "CUSTOMER COPY" : "RESTAURANT COPY";
+      blocks.push(buildReceiptText(order, settings, label) + "\n\n\n\n");
+    }
+    const area = document.getElementById("receipt-area");
+    area.innerHTML = blocks.map(b => `<div class="receipt-copy">${escapeHtml(b)}</div>`).join("");
+    setTimeout(()=>window.print(), 60);
+    return { ok:true };
+  },
+
+  async printText(text, settings){
+    const mode = (settings.printer_mode || "browser").toLowerCase();
+    if (mode !== "browser"){
+      const p = new EscPos();
+      p.init(); p.align(0);
+      for (const line of String(text).split("\n")) p.line(line);
+      if (settings.printer_drawer === "1") p.kickDrawer();
+      p.cut(settings.printer_cut || "partial");
+      const bytes = p.bytes();
+
+      if (mode === "usb"){
+        if (!USBPrinter.isConnected()){ toast("USB printer not connected","warning"); return { ok:false }; }
+        try{ await USBPrinter.send(bytes); toast("🖨  Printed (USB)","success"); return { ok:true }; }
+        catch(e){ toast("USB print failed: " + e.message,"error",5000); return { ok:false }; }
+      }
+      if (mode === "agent"){
+        const url = (settings.printer_agent_url || "").trim();
+        if (!url){ toast("Set Print Agent URL","warning"); return { ok:false }; }
+        try{
+          const headers = { "Content-Type":"application/json" };
+          if (settings.printer_agent_token) headers["X-Auth-Token"] = settings.printer_agent_token;
+          const r = await fetch(url.replace(/\/+$/,"") + "/print", {
+            method:"POST", headers,
+            body: JSON.stringify({
+              printer: settings.printer_name || "",
+              order_no: "CLOSE-CASH",
+              cut: settings.printer_cut || "partial",
+              drawer: settings.printer_drawer === "1",
+              jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
+            }),
+          });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          toast("🖨  Sent to agent","success"); return { ok:true };
+        }catch(e){ toast("Print agent failed: " + e.message,"error",5000); return { ok:false }; }
+      }
+      if (mode === "cloud"){
+        if (settings.firebase_enabled !== "1"){ toast("Cloud print needs Firebase","warning"); return { ok:false }; }
+        try{
+          await CloudSync.queuePrintJob({
+            printer_name: settings.printer_name || "",
+            order_no: "CLOSE-CASH",
+            cut: settings.printer_cut || "partial",
+            drawer: settings.printer_drawer === "1",
+            copies: 1, data: Array.from(bytes),
+          });
+          toast("☁  Close Cash queued","success"); return { ok:true };
+        }catch(e){ toast("Cloud print failed: " + e.message,"error",5000); return { ok:false }; }
+      }
+    }
+    const area = document.getElementById("receipt-area");
+    area.innerHTML = `<div class="receipt-copy">${escapeHtml(text + "\n\n\n\n")}</div>`;
+    setTimeout(()=>window.print(), 60);
+    return { ok:true };
+  },
+};
+
+/* ═══════════════════ POS PAGE ═══════════════════ */
+const POSPage = {
+  current_order: null,
+  current_cat: null,
+  search: "",
+  initialized: false,
+
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    const el = document.getElementById("page-pos");
+    el.innerHTML = `
+      <div class="pos-left">
+        <input type="text" id="pos-search" placeholder="🔍  Search menu…">
+        <div class="cat-bar" id="pos-cats"></div>
+        <div class="product-grid" id="pos-grid"></div>
+      </div>
+      <div class="card pos-right" id="pos-cart">
+        <button class="btn ghost cart-close" id="cart-close" style="align-self:flex-start;">
+          ← Back to menu
+        </button>
+        <div class="tabs-bar" id="pos-tabs"></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h2 id="pos-order-lbl" style="flex:1; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis;">New Order</h2>
+        </div>
+        <div class="faint" style="font-size:11px;">Type: Delivery</div>
+        <div class="cust-row">
+          <div class="picker" id="cust-picker">
+            <span class="ico">👤</span>
+            <input type="text" id="cust-input" placeholder="Customer (optional)…" autocomplete="off">
+            <span class="arrow">▾</span>
+            <div class="cust-list" id="cust-list"></div>
+          </div>
+        </div>
+        <div class="cart-list" id="cart-list"></div>
+        <div class="totals">
+          <div class="row"><span class="muted">Subtotal</span><span id="sum-sub">0</span></div>
+          <div class="row disc"><span class="muted">Discount</span>
+            <input type="number" id="disc-in" value="0" min="0" step="1000"></div>
+          <div class="row"><span class="muted">Delivery</span><span id="sum-del">0</span></div>
+          <hr class="sep">
+          <div class="row grand"><span>Total</span><span id="sum-grand">0</span></div>
+        </div>
+        <div class="pos-actions">
+          <button class="btn ghost" id="pos-clear">Clear</button>
+          <button class="btn" id="pos-hold">Hold</button>
+          <button class="btn success pay" id="pos-pay">💵  Pay (Cash)</button>
+        </div>
+      </div>`;
+
+    document.getElementById("pos-search").addEventListener("input", e=>{
+      this.search = e.target.value; this.renderProducts();
+    });
+    document.getElementById("disc-in").addEventListener("input", ()=>this.recalc());
+    document.getElementById("pos-clear").addEventListener("click", ()=>this.clearOrder());
+    document.getElementById("pos-hold").addEventListener("click", ()=>this.holdOrder());
+    document.getElementById("pos-pay").addEventListener("click", ()=>this.payOrder());
+    document.getElementById("cart-close").addEventListener("click", ()=>this.closeCartSheet());
+
+    this.initCustomerPicker();
+    this.refreshCategories();
+    this.renderProducts();
+    this.renderTabs();
+    this.newOrder();
+    this.updateCartFab();
+  },
+
+  openCartSheet(){
+    document.getElementById("pos-cart").classList.add("open");
+    const fab = document.getElementById("cart-fab");
+    if (fab) fab.classList.add("hidden");
+  },
+  closeCartSheet(){
+    document.getElementById("pos-cart").classList.remove("open");
+    this.updateCartFab();
+  },
+  updateCartFab(){
+    const fab = document.getElementById("cart-fab");
+    if (!fab) return;
+    const open = document.getElementById("pos-cart").classList.contains("open");
+    const items = this.current_order ? this.current_order.items : [];
+    if (isMobile() && App.page === "pos" && !open) fab.classList.remove("hidden");
+    else fab.classList.add("hidden");
+    const count = items.reduce((a,i)=>a + Number(i.qty||0), 0);
+    const total = this.current_order ? (this.current_order.total || 0) : 0;
+    document.getElementById("cart-fab-count").textContent = String(count);
+    document.getElementById("cart-fab-total").textContent = fmtMoney(total);
+  },
+
+  initCustomerPicker(){
+    const input = document.getElementById("cust-input");
+    const list  = document.getElementById("cust-list");
+    input.addEventListener("focus", ()=>this.openCustList());
+    input.addEventListener("input", ()=>this.openCustList());
+    document.addEventListener("click", e=>{
+      const picker = document.getElementById("cust-picker");
+      if (picker && !picker.contains(e.target)) list.classList.remove("on");
+    });
+  },
+  openCustList(){
+    const list = document.getElementById("cust-list");
+    const q = (document.getElementById("cust-input").value||"").toLowerCase();
+    const rows = DB.customersList("").filter(c =>
+      !q || String(c.name||"").toLowerCase().includes(q) || String(c.phone||"").toLowerCase().includes(q));
+    let html = `<div class="item" data-id=""><b>— Walk-in / No customer —</b></div>`;
+    html += rows.map(c =>
+      `<div class="item" data-id="${c.id}">${escapeHtml(c.name)}${
+        c.phone ? ` <span class="ph">• ${escapeHtml(c.phone)}</span>` : ""}</div>`
+    ).join("");
+    list.innerHTML = html;
+    list.querySelectorAll(".item").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const id = el.dataset.id;
+        if (!id) document.getElementById("cust-input").value = "";
+        else {
+          const c = DB.customers.find(x=>x.id === Number(id));
+          if (c) document.getElementById("cust-input").value = c.name;
+        }
+        list.classList.remove("on");
+      });
+    });
+    list.classList.add("on");
+  },
+  resolveCustomer(){
+    const text = document.getElementById("cust-input").value.trim();
+    if (!text) return { id:null, name:"", phone:"" };
+    const c = DB.customers.find(x=>String(x.name||"").toLowerCase() === text.toLowerCase());
+    return c ? { id:c.id, name:c.name, phone:c.phone||"" }
+             : { id:null, name:text, phone:"" };
+  },
+  setCustomer(id, name){ document.getElementById("cust-input").value = name || ""; },
+
+  refreshCategories(){
+    const bar = document.getElementById("pos-cats");
+    if (!bar) return;
+    const cats = DB.categoriesSorted();   /* Pizza first */
+    let html = `<button class="btn chip ${this.current_cat == null ? "active" : ""}" data-id="">All</button>`;
+    for (const c of cats){
+      html += `<button class="btn chip ${this.current_cat === c.id ? "active" : ""}" data-id="${c.id}">${escapeHtml(c.name)}</button>`;
+    }
+    bar.innerHTML = html;
+    bar.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        this.current_cat = b.dataset.id ? Number(b.dataset.id) : null;
+        this.refreshCategories(); this.renderProducts();
+      });
+    });
+  },
+  renderProducts(){
+    const grid = document.getElementById("pos-grid");
+    if (!grid) return;
+    /* productsList() already returns Pizza items first */
+    const prods = DB.productsList({ search: this.search, category_id: this.current_cat });
+    let html = "";
+    for (const p of prods){
+      if (p.track_stock && p.stock <= 0) continue;
+      const lowStock = p.track_stock && p.stock <= p.low_stock;
+      html += `<div class="product-card" data-id="${p.id}">
+        <div class="emoji">${escapeHtml(p.emoji||"🍕")}</div>
+        <div class="name">${escapeHtml(p.name)}</div>
+        ${lowStock ? `<div class="badge">● ${p.stock|0}</div>` : ""}
+      </div>`;
+    }
+    grid.innerHTML = html;
+    grid.querySelectorAll(".product-card").forEach(card=>{
+      card.addEventListener("click", ()=>{
+        const p = DB.getProduct(Number(card.dataset.id));
+        if (p) this.addProduct(p);
+      });
+    });
+  },
+
+  addProduct(p){
+    if (p.track_stock && p.stock <= 0){ toast(`${p.name} is out of stock`, "warning"); return; }
+    if (p.has_options) this.showOptionDialog(p);
+    else this.addItemToCart(p, 1, [], Number(p.price), "");
+  },
+
+  addItemToCart(p, qty, options, unit, note){
+    this.current_order.items.push({
+      key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      product_id: p.id, name: p.name, emoji: p.emoji,
+      qty, unit, options, note: note || "", line: unit * qty,
+    });
+    this.renderCart(); this.recalc(); this.updateCartFab();
+  },
+
+  showOptionDialog(p){
+    const groups = optionsFor(p);
+    const state = { size:null, flavorSet:new Set(), groups:{}, qty:1, note:"" };
+    const sym = DB.settings.currency_symbol;
+
+    const rebuild = ()=>{
+      let html = `<div class="m-head">
+        <div style="font-size:34px;">${escapeHtml(p.emoji||"🍕")}</div>
+        <h2 style="flex:1;">${escapeHtml(p.name)}</h2>
+        <button class="btn ghost" id="opt-cancel-x">✕</button>
+      </div><div class="m-body">`;
+      for (const grp of groups){
+        const isSize    = grp.name === "Size";
+        const isFlavor  = grp.name === "Flavor";
+        const isExtras  = grp.name === EXTRAS_GROUP_NAME;
+        const largeOnly = !!grp.large_only;
+        const isLarge   = state.size === "Large";
+        const show = isExtras || !largeOnly || isLarge;
+
+        let hint;
+        if (isExtras){
+          hint = ` <span class="faint">(optional · tap to toggle)</span>`;
+        } else if (isFlavor && largeOnly){
+          hint = ` <span class="faint">(choose 1 or 2)</span>`;
+        } else if (grp.multi && grp.max_choices){
+          hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
+        } else if (grp.multi){
+          hint = " <span class='faint'>(multiple)</span>";
+        } else {
+          hint = "";
+        }
+
+        html += `<div class="opt-group" style="display:${show?"block":"none"};">
+          <h3>${escapeHtml(grp.name)}${hint}</h3>
+          <div class="opt-chips">`;
+        for (const ch of grp.choices){
+          let on = false;
+          if (isSize) on = state.size === ch.label;
+          else if (isFlavor) on = state.flavorSet.has(ch.label);
+          else on = !!(state.groups[grp.name] && state.groups[grp.name][ch.label]);
+          let priceStr = "";
+          if (Number(ch.price)){
+            const sign = ch.price > 0 ? "+" : "−";
+            priceStr = `  ${sign}${fmtMoney(Math.abs(ch.price), sym)}`;
+          }
+          html += `<button class="opt-chip ${on?"on":""}" data-grp="${escapeHtml(grp.name)}" data-label="${escapeHtml(ch.label)}">${escapeHtml(ch.label)}${priceStr}</button>`;
+        }
+        html += `</div></div>`;
+      }
+      html += `<div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+        <span class="muted">Quantity</span>
+        <input type="number" id="opt-qty" min="1" max="99" value="${state.qty}" style="width:90px;">
+      </div>
+      <div style="margin-top:10px;">
+        <h3 style="margin-bottom:6px;">Note <span class="faint">(optional)</span></h3>
+        <textarea id="opt-note" rows="2" maxlength="180" placeholder="E.g. extra napkins, no onions on top…" style="width:100%; font-family:inherit; font-size:13px;">${escapeHtml(state.note)}</textarea>
+      </div>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="opt-cancel">Cancel</button>
+        <button class="btn primary" id="opt-add">Add to Order</button>
+      </div>`;
+      Modal._render(html);
+      document.getElementById("opt-cancel-x").addEventListener("click", ()=>Modal.close());
+      document.getElementById("opt-cancel").addEventListener("click", ()=>Modal.close());
+      document.getElementById("opt-qty").addEventListener("input", e=>{
+        state.qty = Math.max(1, Math.min(99, Number(e.target.value)||1));
+      });
+      document.getElementById("opt-note").addEventListener("input", e=>{ state.note = e.target.value; });
+      document.getElementById("opt-add").addEventListener("click", ()=>finalize());
+      document.getElementById("modal").querySelectorAll(".opt-chip").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const g = btn.dataset.grp, l = btn.dataset.label;
+          if (g === "Size"){
+            state.size = (state.size === l) ? null : l;
+            if (state.size !== "Large") state.flavorSet.clear();
+          } else if (g === "Flavor"){
+            if (state.flavorSet.has(l)) state.flavorSet.delete(l);
+            else {
+              if (state.flavorSet.size >= 2) state.flavorSet.delete(state.flavorSet.values().next().value);
+              state.flavorSet.add(l);
+            }
+          } else {
+            const grp = groups.find(x=>x.name === g);
+            state.groups[g] = state.groups[g] || {};
+            if (grp && !grp.multi) state.groups[g] = { [l]: true };
+            else state.groups[g][l] = !state.groups[g][l];
+          }
+          const active = document.activeElement;
+          const wasNote = active && active.id === "opt-note";
+          rebuild();
+          if (wasNote){
+            const el = document.getElementById("opt-note");
+            if (el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+          }
+        });
+      });
+    };
+
+    const finalize = ()=>{
+      const chosen = [];
+      const isLarge = state.size === "Large";
+      for (const grp of groups){
+        if (grp.large_only && !isLarge) continue;
+        if (grp.name === "Size"){
+          if (state.size){
+            const ch = grp.choices.find(c=>c.label === state.size);
+            chosen.push({ group:grp.name, label:state.size, price: ch?ch.price:0 });
+          }
+        } else if (grp.name === "Flavor"){
+          for (const l of state.flavorSet){
+            const ch = grp.choices.find(c=>c.label === l);
+            chosen.push({ group:grp.name, label:l, price: ch?ch.price:0 });
+          }
+        } else {
+          const sel = state.groups[grp.name] || {};
+          for (const l of Object.keys(sel)){
+            if (sel[l]){
+              const ch = grp.choices.find(c=>c.label === l);
+              chosen.push({ group:grp.name, label:l, price: ch?ch.price:0 });
+            }
+          }
+        }
+      }
+      if (isLarge){
+        const flavors = chosen.filter(c=>c.group === "Flavor");
+        if (flavors.length < 1){
+          toast("Please choose at least 1 flavor for a Large pizza.", "warning");
+          return;
+        }
+      }
+      const unit = computeUnitPrice(p, chosen);
+      const note = (state.note||"").trim();
+      Modal.close();
+      this.addItemToCart(p, state.qty, chosen, unit, note);
+    };
+
+    Modal.open("");
+    rebuild();
+  },
+
+  renderCart(){
+    const wrap = document.getElementById("cart-list");
+    if (!wrap || !this.current_order) return;
+    const items = this.current_order.items;
+    if (!items.length){
+      wrap.innerHTML = `<div class="cart-empty">Cart is empty<br>Click a product to add it</div>`;
+      return;
+    }
+    const s = DB.settings;
+    wrap.innerHTML = items.map(it=>{
+      const opts = (it.options||[]).map(o=>o.label).join(", ");
+      const note = (it.note||"").trim();
+      return `<div class="cart-line" data-key="${escapeHtml(it.key)}">
+        <div class="info">
+          <div class="nm">${escapeHtml(it.emoji||"")} ${escapeHtml(it.name)}</div>
+          ${opts?`<div class="opts">${escapeHtml(opts)}</div>`:""}
+          ${note?`<div class="note">📝 ${escapeHtml(note)}</div>`:""}
+          <div class="unit">${fmtMoney(it.unit, s.currency_symbol)}  (${fmtMoneySecondary(it.unit, s)})</div>
+        </div>
+        <div class="qty-ctrl">
+          <button data-act="dec">−</button>
+          <div class="q">${it.qty}</div>
+          <button data-act="inc">+</button>
+        </div>
+        <div class="total">${fmtMoney(it.line, s.currency_symbol)}
+          <div class="usd">${fmtMoneySecondary(it.line, s)}</div></div>
+        <button class="btn icon" data-act="del">✕</button>
+      </div>`;
+    }).join("");
+    wrap.querySelectorAll(".cart-line").forEach(line=>{
+      const key = line.dataset.key;
+      line.querySelectorAll("button").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          const act = b.dataset.act;
+          if (act === "inc") this.changeQty(key, +1);
+          else if (act === "dec") this.changeQty(key, -1);
+          else if (act === "del") this.removeItem(key);
+        });
+      });
+    });
+  },
+  changeQty(key, delta){
+    for (const it of this.current_order.items){
+      if (it.key === key){
+        it.qty = Math.max(1, it.qty + delta);
+        it.line = it.unit * it.qty;
+        break;
+      }
+    }
+    this.renderCart(); this.recalc(); this.updateCartFab();
+  },
+  removeItem(key){
+    this.current_order.items = this.current_order.items.filter(i=>i.key !== key);
+    this.renderCart(); this.recalc(); this.updateCartFab();
+  },
+
+  recalc(){
+    if (!this.current_order) return;
+    const s = DB.settings;
+    const subtotal = this.current_order.items.reduce((a,i)=>a + (Number(i.line)||0), 0);
+    let disc = Number((document.getElementById("disc-in")||{}).value) || 0;
+    disc = Math.max(0, disc);
+    const base = Math.max(0, subtotal - disc);
+    const tax = 0;
+    const delivery = Number(DB.settings.delivery_fee) || 0;
+    const grand = base + tax + delivery;
+    Object.assign(this.current_order, { subtotal, discount:disc, tax, delivery, total:grand });
+    const sub = document.getElementById("sum-sub");
+    const del = document.getElementById("sum-del");
+    const gr  = document.getElementById("sum-grand");
+    if (sub) sub.textContent   = fmtMoneyDual(subtotal, s);
+    if (del) del.textContent   = fmtMoneyDual(delivery, s);
+    if (gr)  gr.textContent    = fmtMoneyDual(grand, s);
+    this.updateCartFab();
+  },
+
+  renderTabs(){
+    const bar = document.getElementById("pos-tabs");
+    if (!bar) return;
+    const orders = DB.openOrders();
+    const curId = this.current_order && this.current_order.id;
+    let html = `<button class="btn chip" data-id="new">+ New</button>`;
+    for (const o of orders){
+      const num = String(o.order_no||"").split("-").pop();
+      html += `<button class="btn chip ${o.id === curId ? "active" : ""}" data-id="${o.id}">#${escapeHtml(num)}</button>`;
+    }
+    bar.innerHTML = html;
+    bar.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        if (b.dataset.id === "new") this.newOrder();
+        else {
+          const o = orders.find(x=>x.id === Number(b.dataset.id));
+          if (o) this.loadOrder(o);
+        }
+      });
+    });
+  },
+  loadOrder(o){
+    this.current_order = {
+      id:o.id, no:o.order_no, type:o.order_type || "Delivery",
+      items: o.items.map(i=>({
+        key:String(i.id), product_id:i.product_id, name:i.name, emoji:"",
+        qty:i.qty, unit:i.unit_price,
+        options: String(i.options||"").split(",").map(t=>({label:t.trim()})).filter(x=>x.label),
+        note: i.note||"", line:i.line_total,
+      })),
+      customer_id:o.customer_id, customer_name:o.customer_name || "",
+      customer_phone:o.customer_phone || "",
+      discount:Number(o.discount)||0, delivery:Number(o.delivery)||0,
+    };
+    document.getElementById("pos-order-lbl").textContent = "Order " + o.order_no;
+    this.setCustomer(o.customer_id, o.customer_name || "");
+    document.getElementById("disc-in").value = String(this.current_order.discount|0);
+    this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
+    if (isMobile()) this.openCartSheet();
+  },
+  newOrder(){
+    this.current_order = {
+      id:null, no: DB.nextOrderNo(), type:"Delivery",
+      items:[], customer_id:null, customer_name:"", customer_phone:"",
+      discount:0, delivery:0, subtotal:0, tax:0, total:0,
+    };
+    document.getElementById("pos-order-lbl").textContent = "Order " + this.current_order.no + "  (new)";
+    this.setCustomer(null, "");
+    document.getElementById("disc-in").value = "0";
+    this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
+  },
+  clearOrder(){
+    if (!this.current_order) return;
+    if (this.current_order.items.length && !confirm("Clear this order?")) return;
+    this.current_order.items = [];
+    document.getElementById("disc-in").value = "0";
+    this.renderCart(); this.recalc(); this.updateCartFab();
+  },
+  holdOrder(){
+    if (!this.current_order || !this.current_order.items.length){
+      toast("Nothing to hold", "warning"); return;
+    }
+    const { id, name, phone } = this.resolveCustomer();
+    this.current_order.customer_id = id;
+    this.current_order.customer_name = name;
+    this.current_order.customer_phone = phone;
+    DB.saveOrder(this.current_order, "open");
+    DB.saveAll();
+    toast(`Order ${this.current_order.no} held — visible on all devices`, "success");
+    this.renderTabs();
+    this.newOrder();
+    if (isMobile()) this.closeCartSheet();
+  },
+
+  payOrder(){
+    if (!this.current_order || !this.current_order.items.length){
+      toast("Cart is empty", "warning"); return;
+    }
+    const total = this.current_order.total;
+    const s = DB.settings;
+    Modal.open(`<div class="m-head"><h1>Take Payment</h1></div>
+      <div class="m-body">
+        <div style="font-size:14px; font-weight:700; margin-bottom:12px;">
+          Total: ${fmtMoneyDual(total, s)}</div>
+        <div class="muted" style="font-size:12px; margin-bottom:6px;">Payment method: Cash</div>
+        <h3>Amount tendered (cash, LBP)</h3>
+        <input type="number" id="pay-cash" value="${Math.round(total)}" style="margin-top:6px;">
+        <div id="pay-change" class="muted" style="margin-top:8px;">Change: —</div>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="pay-cancel">Cancel</button>
+        <button class="btn success" id="pay-ok">Confirm Payment</button>
+      </div>`);
+    const update = ()=>{
+      const v = Number(document.getElementById("pay-cash").value) || 0;
+      const ch = v - total;
+      const el = document.getElementById("pay-change");
+      if (ch >= 0) el.textContent = "Change: " + fmtMoneyDual(ch, s);
+      else el.textContent = "Insufficient cash";
+    };
+    document.getElementById("pay-cash").addEventListener("input", update);
+    document.getElementById("pay-cancel").addEventListener("click", ()=>Modal.close());
+    document.getElementById("pay-ok").addEventListener("click", ()=>{
+      const v = Number(document.getElementById("pay-cash").value) || 0;
+      if (v < total){ toast("Cash tendered is less than total", "warning"); return; }
+      Modal.close();
+      this.finalizePayment();
+    });
+    update();
+  },
+
+  async finalizePayment(){
+    const { id, name, phone } = this.resolveCustomer();
+    this.current_order.customer_id = id;
+    this.current_order.customer_name = name;
+    this.current_order.customer_phone = phone;
+    this.current_order.payment_method = "Cash";
+    this.current_order.user_id = App.user ? App.user.id : null;
+
+    DB.saveOrder(this.current_order, "paid");
+    DB.deductStock(this.current_order);
+    DB.saveAll();
+
+    const snapshot = {
+      id:this.current_order.id, no:this.current_order.no,
+      type:this.current_order.type || "Delivery",
+      customer_id:id, customer_name:name, customer_phone:phone,
+      items:this.current_order.items.map(i=>({
+        name:i.name, qty:i.qty, unit:i.unit, line:i.line,
+        options:i.options||[], note:i.note||"",
+      })),
+      subtotal:this.current_order.subtotal, discount:this.current_order.discount,
+      tax:this.current_order.tax, delivery:this.current_order.delivery,
+      total:this.current_order.total, payment_method:"Cash",
+    };
+
+    /* Optional reporting push (unchanged remote-connection feature) */
+    CloudSync.pushOrder(snapshot);
+
+    const S = DB.settings;
+    const auto = S.printer_auto === "1";
+    if (auto){
+      const res = await Printer.print(snapshot, S);
+      if (!res || !res.ok){
+        toast("Print failed — opening receipt for manual retry.", "warning", 4500);
+        ReceiptDialog.show(snapshot);
+      } else {
+        toast(`Paid ${fmtMoney(snapshot.total)}`, "success");
+      }
+    } else {
+      toast(`Paid ${fmtMoney(snapshot.total)}`, "success");
+      ReceiptDialog.show(snapshot);
+    }
+
+    this.newOrder();
+    if (isMobile()) this.closeCartSheet();
+  },
+};
+
+/* ═══════════════════ RECEIPT DIALOG ═══════════════════ */
+const ReceiptDialog = {
+  show(order){
+    const text = buildReceiptText(order, DB.settings, "CUSTOMER COPY");
+    const S = DB.settings;
+    const mode = (S.printer_mode || "browser").toLowerCase();
+    Modal.open(`<div class="m-head"><h1>🧾  Receipt</h1></div>
+      <div class="m-body">
+        <textarea id="rcpt-text" readonly
+          style="width:100%; height:min(60vh,400px); font-family:ui-monospace,monospace; font-size:12px;"
+          >${escapeHtml(text)}</textarea>
+        <div class="faint" style="font-size:11px; margin-top:8px;">
+          Mode: <b>${escapeHtml(mode)}</b> · Cut: <b>${escapeHtml(S.printer_cut||"partial")}</b> ·
+          Copies: <b>${escapeHtml(String(S.printer_copies||"2"))}</b> ·
+          Drawer: <b>${S.printer_drawer==="1"?"on":"off"}</b>
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="rcpt-close">Close</button>
+        <button class="btn success" id="rcpt-print">🖨  Print now</button>
+      </div>`);
+    document.getElementById("rcpt-close").addEventListener("click", ()=>Modal.close());
+    document.getElementById("rcpt-print").addEventListener("click", async ()=>{
+      const res = await Printer.print(order, DB.settings);
+      if (res && res.ok) toast("Print job sent", "success");
+    });
+  },
+};
+
+/* ═══════════════════ PRODUCTS PAGE ═══════════════════ */
+const ProductsPage = {
+  search:"", initialized:false,
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    const el = document.getElementById("page-products");
+    el.innerHTML = `
+      <div class="page-head">
+        <h1>Products</h1>
+        <button class="btn" id="add-cat">+ Category</button>
+        <button class="btn primary" id="add-product">+ New Product</button>
+      </div>
+      <input type="text" id="prod-search" placeholder="🔍  Search…" style="margin-bottom:12px;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:55px;">Emoji</th><th>Name</th><th>Category</th>
+            <th>Price</th><th>Cost</th><th>Stock</th><th>Options</th>
+            <th style="width:140px;">Actions</th>
+          </tr></thead>
+          <tbody id="prod-tbody"></tbody>
+        </table>
+      </div>`;
+    document.getElementById("prod-search").addEventListener("input", e=>{
+      this.search = e.target.value; this.render();
+    });
+    document.getElementById("add-product").addEventListener("click", ()=>this.edit(null));
+    document.getElementById("add-cat").addEventListener("click", ()=>{
+      const name = prompt("Category name:");
+      if (name && name.trim()){
+        DB.saveCategory({ name: name.trim(), sort_order:99 });
+        toast(`Category '${name}' added`, "success");
+        POSPage.refreshCategories();
+      }
+    });
+    this.render();
+  },
+  render(){
+    /* productsList() returns pizza products first */
+    const rows = DB.productsList({ search:this.search, only_active:false });
+    const sym = DB.settings.currency_symbol;
+    const tb = document.getElementById("prod-tbody");
+    if (!tb) return;
+    tb.innerHTML = rows.map(p=>{
+      const cat = p.category_id ? DB.categories.find(c=>c.id === p.category_id) : null;
+      const stock = p.track_stock ? String(p.stock|0) : "—";
+      const hasCo = !!(p.custom_options||"").trim();
+      const opts = hasCo ? "Custom" : (p.has_options ? "Yes" : "No");
+      return `<tr data-id="${p.id}">
+        <td>${escapeHtml(p.emoji||"")}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(cat ? cat.name : "—")}</td>
+        <td>${fmtMoney(p.price, sym)}</td>
+        <td>${fmtMoney(p.cost, sym)}</td>
+        <td>${stock}</td>
+        <td>${opts}</td>
+        <td>
+          <button class="btn icon" data-act="edit">Edit</button>
+          <button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>
+        </td></tr>`;
+    }).join("");
+    tb.querySelectorAll("tr").forEach(tr=>{
+      const p = DB.getProduct(Number(tr.dataset.id));
+      tr.querySelectorAll("button").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          if (b.dataset.act === "edit") this.edit(p);
+          else if (confirm(`Delete product '${p.name}'?`)){
+            DB.deleteProduct(p.id);
+            DB.saveAll();
+            this.render(); POSPage.renderProducts();
+          }
+        });
+      });
+    });
+  },
+  edit(p){
+    const isNew = !p;
+    p = p || { name:"", emoji:"🍕", category_id:null, price:0, cost:0, stock:0,
+               track_stock:0, low_stock:5, has_options:0, active:1, custom_options:"" };
+    const cats = DB.categoriesSorted();
+    Modal.open(`<div class="m-head"><h2>${isNew?"New":"Edit"} Product</h2></div>
+      <div class="m-body">
+        <div class="form-row"><label>Name</label><input id="p-name" value="${escapeHtml(p.name)}"></div>
+        <div class="form-row"><label>Emoji</label><input id="p-emoji" value="${escapeHtml(p.emoji||"🍕")}"></div>
+        <div class="form-row"><label>Category</label>
+          <select id="p-cat"><option value="">— none —</option>
+            ${cats.map(c=>`<option value="${c.id}" ${p.category_id === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+          </select></div>
+        <div class="form-row"><label>Price</label><input id="p-price" type="number" value="${p.price|0}" step="1000"></div>
+        <div class="form-row"><label>Cost</label><input id="p-cost" type="number" value="${p.cost|0}" step="1000"></div>
+        <div class="form-row"><label>Stock</label><input id="p-stock" type="number" value="${p.stock|0}"></div>
+        <div class="form-row"><label>Low stock</label><input id="p-low" type="number" value="${p.low_stock|0}"></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="p-track" ${p.track_stock?"checked":""}> Track stock</label></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="p-opts" ${p.has_options?"checked":""}> Has options</label></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="p-active" ${p.active?"checked":""}> Active</label></div>
+        <h3 style="margin-top:10px;">Custom options (JSON)</h3>
+        <textarea id="p-custom" rows="6">${escapeHtml(p.custom_options||"")}</textarea>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="p-cancel">Cancel</button>
+        <button class="btn primary" id="p-save">Save</button>
+      </div>`);
+    document.getElementById("p-cancel").addEventListener("click", ()=>Modal.close());
+    document.getElementById("p-save").addEventListener("click", ()=>{
+      const name = document.getElementById("p-name").value.trim();
+      if (!name){ toast("Name is required", "warning"); return; }
+      const custom = document.getElementById("p-custom").value.trim();
+      if (custom){
+        try{
+          const parsed = JSON.parse(custom);
+          if (!Array.isArray(parsed)) throw new Error("must be array");
+        }catch(e){ toast("Custom options JSON invalid: " + e.message, "error"); return; }
+      }
+      const data = {
+        name, emoji: document.getElementById("p-emoji").value.trim()||"🍕",
+        category_id: Number(document.getElementById("p-cat").value)||null,
+        price: Number(document.getElementById("p-price").value)||0,
+        cost: Number(document.getElementById("p-cost").value)||0,
+        stock: Number(document.getElementById("p-stock").value)||0,
+        low_stock: Number(document.getElementById("p-low").value)||5,
+        track_stock: document.getElementById("p-track").checked ? 1 : 0,
+        has_options: document.getElementById("p-opts").checked ? 1 : 0,
+        active: document.getElementById("p-active").checked ? 1 : 0,
+        custom_options: custom,
+      };
+      DB.saveProduct(data, p.id);
+      DB.saveAll();
+      Modal.close(); this.render(); POSPage.renderProducts();
+      toast("Saved — synced to all devices", "success");
+    });
+  },
+};
+
+/* ═══════════════════ CUSTOMERS PAGE ═══════════════════ */
+const CustomersPage = {
+  search:"", initialized:false,
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    const el = document.getElementById("page-customers");
+    el.innerHTML = `
+      <div class="page-head">
+        <h1>Customers</h1>
+        <button class="btn primary" id="add-cust">+ New Customer</button>
+      </div>
+      <input type="text" id="cust-search" placeholder="🔍  Search by name or phone…" style="margin-bottom:12px;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th>Address</th>
+            <th style="width:150px;">Actions</th></tr></thead>
+          <tbody id="cust-tbody"></tbody>
+        </table>
+      </div>`;
+    document.getElementById("cust-search").addEventListener("input", e=>{
+      this.search = e.target.value; this.render();
+    });
+    document.getElementById("add-cust").addEventListener("click", ()=>this.edit(null));
+    this.render();
+  },
+  render(){
+    const rows = DB.customersList(this.search);
+    const tb = document.getElementById("cust-tbody");
+    if (!tb) return;
+    tb.innerHTML = rows.map(c=>`
+      <tr data-id="${c.id}">
+        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(c.phone||"")}</td>
+        <td>${escapeHtml(c.address||"")}</td>
+        <td>
+          <button class="btn icon" data-act="edit">Edit</button>
+          <button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>
+        </td></tr>`).join("");
+    tb.querySelectorAll("tr").forEach(tr=>{
+      const c = DB.customers.find(x=>x.id === Number(tr.dataset.id));
+      tr.querySelectorAll("button").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          if (b.dataset.act === "edit") this.edit(c);
+          else if (confirm(`Delete customer '${c.name}'?`)){
+            DB.deleteCustomer(c.id);
+            DB.saveAll();
+            this.render();
+          }
+        });
+      });
+    });
+  },
+  edit(c){
+    const isNew = !c;
+    c = c || { name:"", phone:"", address:"" };
+    Modal.open(`<div class="m-head"><h2>${isNew?"New":"Edit"} Customer</h2></div>
+      <div class="m-body">
+        <div class="form-row"><label>Name</label><input id="c-name" value="${escapeHtml(c.name)}"></div>
+        <div class="form-row"><label>Phone</label><input id="c-phone" value="${escapeHtml(c.phone||"")}"></div>
+        <div class="form-row"><label>Address</label><input id="c-addr" value="${escapeHtml(c.address||"")}"></div>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="c-cancel">Cancel</button>
+        <button class="btn primary" id="c-save">Save</button>
+      </div>`);
+    document.getElementById("c-cancel").addEventListener("click", ()=>Modal.close());
+    document.getElementById("c-save").addEventListener("click", ()=>{
+      const name = document.getElementById("c-name").value.trim();
+      if (!name){ toast("Name is required", "warning"); return; }
+      const data = {
+        name, phone: document.getElementById("c-phone").value.trim(),
+        address: document.getElementById("c-addr").value.trim(),
+      };
+      DB.saveCustomer(data, c.id);
+      DB.saveAll();
+      Modal.close(); this.render();
+      toast("Saved", "success");
+      if (isNew) CloudSync.pushCustomer(data);
+    });
+  },
+};
+
+/* ═══════════════════ EXPENSES PAGE ═══════════════════ */
+const ExpensesPage = {
+  initialized:false,
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    const el = document.getElementById("page-expenses");
+    el.innerHTML = `
+      <div class="page-head">
+        <h1>Expenses</h1>
+        <button class="btn primary" id="add-exp">+ New Expense</button>
+      </div>
+      <div class="muted" id="exp-total" style="margin-bottom:12px;"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Category</th><th>Description</th>
+            <th>Amount</th><th style="width:150px;">Actions</th></tr></thead>
+          <tbody id="exp-tbody"></tbody>
+        </table>
+      </div>`;
+    document.getElementById("add-exp").addEventListener("click", ()=>this.edit(null));
+    this.render();
+  },
+  render(){
+    const rows = DB.expensesList();
+    const sym = DB.settings.currency_symbol;
+    const total = rows.reduce((a,r)=>a + (Number(r.amount)||0), 0);
+    const lbl = document.getElementById("exp-total");
+    if (lbl) lbl.textContent = `${rows.length} entries  •  Total ${fmtMoney(total, sym)}`;
+    const tb = document.getElementById("exp-tbody");
+    if (!tb) return;
+    tb.innerHTML = rows.map(r=>`
+      <tr data-id="${r.id}">
+        <td>${escapeHtml(r.spent_on||"")}</td>
+        <td>${escapeHtml(r.category||"")}</td>
+        <td>${escapeHtml(r.description||"")}</td>
+        <td>${fmtMoney(r.amount, sym)}</td>
+        <td>
+          <button class="btn icon" data-act="edit">Edit</button>
+          <button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>
+        </td></tr>`).join("");
+    tb.querySelectorAll("tr").forEach(tr=>{
+      const e = DB.expenses.find(x=>x.id === Number(tr.dataset.id));
+      tr.querySelectorAll("button").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          if (b.dataset.act === "edit") this.edit(e);
+          else if (confirm("Delete this expense?")){
+            DB.deleteExpense(e.id);
+            DB.saveAll();
+            this.render();
+          }
+        });
+      });
+    });
+  },
+  edit(e){
+    const isNew = !e;
+    e = e || { category:"General", description:"", amount:0, spent_on:todayStr() };
+    const cats = ["General","Ingredients","Rent","Utilities","Salaries","Marketing","Maintenance","Other"];
+    Modal.open(`<div class="m-head"><h2>${isNew?"New":"Edit"} Expense</h2></div>
+      <div class="m-body">
+        <div class="form-row"><label>Category</label>
+          <input id="e-cat" list="exp-cats" value="${escapeHtml(e.category)}">
+          <datalist id="exp-cats">${cats.map(c=>`<option value="${c}">`).join("")}</datalist>
+        </div>
+        <div class="form-row"><label>Description</label><input id="e-desc" value="${escapeHtml(e.description)}"></div>
+        <div class="form-row"><label>Amount</label><input id="e-amount" type="number" value="${e.amount|0}" step="1000"></div>
+        <div class="form-row"><label>Date</label><input id="e-date" type="date" value="${escapeHtml(e.spent_on||todayStr())}"></div>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="e-cancel">Cancel</button>
+        <button class="btn primary" id="e-save">Save</button>
+      </div>`);
+    document.getElementById("e-cancel").addEventListener("click", ()=>Modal.close());
+    document.getElementById("e-save").addEventListener("click", ()=>{
+      const data = {
+        category: document.getElementById("e-cat").value.trim()||"General",
+        description: document.getElementById("e-desc").value.trim(),
+        amount: Number(document.getElementById("e-amount").value)||0,
+        spent_on: document.getElementById("e-date").value||todayStr(),
+      };
+      DB.saveExpense(data, e.id);
+      DB.saveAll();
+      Modal.close(); this.render(); toast("Saved", "success");
+    });
+  },
+};
+
+/* ═══════════════════ REPORTS PAGE ═══════════════════ */
+const ReportsPage = {
+  from:null, to:null, initialized:false,
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    this.from = addDaysStr(todayStr(), -7);
+    this.to   = todayStr();
+    const el = document.getElementById("page-reports");
+    el.innerHTML = `
+      <div class="page-head"><h1>Reports</h1></div>
+      <div class="report-controls">
+        <label class="muted">From</label><input type="date" id="rep-from">
+        <label class="muted">To</label><input type="date" id="rep-to">
+        <button class="btn primary" id="rep-apply">Apply</button>
+        <button class="btn ghost" data-q="0">Today</button>
+        <button class="btn ghost" data-q="7">Week</button>
+        <button class="btn ghost" data-q="30">Month</button>
+      </div>
+      <div class="cards-row" id="rep-cards"></div>
+      <div class="report-grid">
+        <div class="card report-box"><h3>🏆 Top Products</h3>
+          <table><thead><tr><th>Product</th><th>Qty</th><th>Revenue</th></tr></thead>
+          <tbody id="rep-top"></tbody></table></div>
+        <div class="card report-box"><h3>📂 Sales by Category</h3>
+          <table><thead><tr><th>Category</th><th>Revenue</th></tr></thead>
+          <tbody id="rep-cat"></tbody></table></div>
+        <div class="card report-box"><h3>💵 Payment Methods</h3>
+          <table><thead><tr><th>Method</th><th>Count</th><th>Revenue</th></tr></thead>
+          <tbody id="rep-pm"></tbody></table></div>
+      </div>
+      <div class="card report-box" style="margin-bottom:12px;">
+        <h3>📅 Daily Sales</h3>
+        <table><thead><tr><th>Date</th><th>Orders</th><th>Revenue</th></tr></thead>
+        <tbody id="rep-days"></tbody></table>
+      </div>
+      <div class="card" style="padding:14px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <h3 style="flex:1; min-width:120px;">💵 Close Cash</h3>
+          <button class="btn primary" id="rep-print-cc">🖨  Print Close Cash</button>
+          <button class="btn ghost" id="rep-sync-cc">☁  Sync to Firebase</button>
+        </div>
+        <div class="muted" id="rep-cc-info" style="margin-top:8px;"></div>
+      </div>`;
+    document.getElementById("rep-from").value = this.from;
+    document.getElementById("rep-to").value   = this.to;
+    document.getElementById("rep-from").addEventListener("change", e=>{ this.from = e.target.value; this.render(); });
+    document.getElementById("rep-to").addEventListener("change", e=>{ this.to = e.target.value; this.render(); });
+    document.getElementById("rep-apply").addEventListener("click", ()=>this.render());
+    el.querySelectorAll("[data-q]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        this.from = addDaysStr(todayStr(), -Number(b.dataset.q));
+        this.to = todayStr();
+        document.getElementById("rep-from").value = this.from;
+        document.getElementById("rep-to").value = this.to;
+        this.render();
+      });
+    });
+    document.getElementById("rep-print-cc").addEventListener("click", async ()=>{
+      const text = buildCloseCashText(this.from, this.to, DB.settings);
+      await Printer.printText(text, DB.settings);
+    });
+    document.getElementById("rep-sync-cc").addEventListener("click", async ()=>{
+      if (DB.settings.firebase_enabled !== "1"){ toast("Enable Cloud Sync in Settings first", "warning"); return; }
+      const res = await CloudSync.pushCloseCash(this.from, this.to);
+      if (res.ok) toast("Close Cash synced to Firebase", "success");
+      else toast("Firebase sync failed: " + res.info, "error", 5000);
+    });
+    this.render();
+  },
+  render(){
+    const s = this.from, e = this.to;
+    const settings = DB.settings;
+    const sym = settings.currency_symbol;
+    const summ = DB.summary(s, e);
+    const profit = summ.revenue - summ.expenses;
+    const cards = document.getElementById("rep-cards");
+    if (cards) cards.innerHTML = `
+      <div class="card metric-card"><div class="lbl">Orders</div><div class="val">${summ.orders}</div></div>
+      <div class="card metric-card"><div class="lbl">Revenue</div><div class="val">${fmtMoney(summ.revenue, sym)}</div></div>
+      <div class="card metric-card"><div class="lbl">Discount</div><div class="val">${fmtMoney(summ.discount, sym)}</div></div>
+      <div class="card metric-card"><div class="lbl">Expenses</div><div class="val">${fmtMoney(summ.expenses, sym)}</div></div>
+      <div class="card metric-card"><div class="lbl">Net Profit</div><div class="val">${fmtMoney(profit, sym)}</div></div>`;
+    const tTop = document.getElementById("rep-top");
+    if (tTop) tTop.innerHTML = DB.topProducts(s,e).map(r=>
+      `<tr><td>${escapeHtml(r.name)}</td><td>${r.qty|0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+    const tCat = document.getElementById("rep-cat");
+    if (tCat) tCat.innerHTML = DB.salesByCategory(s,e).map(r=>
+      `<tr><td>${escapeHtml(r.category)}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+    const tPm = document.getElementById("rep-pm");
+    if (tPm) tPm.innerHTML = DB.salesByMethod(s,e).map(r=>
+      `<tr><td>${escapeHtml(r.method)}</td><td>${r.c}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+    const tDays = document.getElementById("rep-days");
+    if (tDays) tDays.innerHTML = DB.salesByDay(s,e).map(r=>
+      `<tr><td>${escapeHtml(r.day)}</td><td>${r.orders}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+    const cash = DB.cashSummary(s,e);
+    const info = document.getElementById("rep-cc-info");
+    if (info) info.innerHTML =
+      `<b>Cash orders:</b> ${cash.cash_orders} • <b>Cash sales:</b> ${fmtMoney(cash.cash_sales, sym)} ` +
+      `<span class="faint">(${fmtMoneySecondary(cash.cash_sales, settings)})</span> • ` +
+      `<b>Expenses:</b> ${fmtMoney(cash.expenses, sym)} <span class="faint">(${fmtMoneySecondary(cash.expenses, settings)})</span><br>` +
+      `<b>Expected in drawer:</b> ${fmtMoney(cash.expected, sym)} ` +
+      `<span class="faint">(${fmtMoneySecondary(cash.expected, settings)})</span>`;
+  },
+};
+
+/* ═══════════════════ SETTINGS PAGE ═══════════════════ */
+const SettingsPage = {
+  initialized:false,
+  _timer:null,
+  init(){
+    if (this.initialized) return;
+    this.initialized = true;
+    const el = document.getElementById("page-settings");
+    el.innerHTML = `
+      <div class="page-head"><h1>Settings</h1></div>
+
+      <div class="card" style="padding:20px; margin-bottom:14px;">
+        <h3 style="margin-bottom:8px;">📲  Install as an App (PWA)</h3>
+        <div class="faint" style="font-size:11px; margin-bottom:10px; line-height:1.6;">
+          Install Pizza POS on this phone so it opens full-screen like a native app
+          and keeps working when the network drops.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn primary" id="s-install">📲 Install Pizza POS</button>
+          <span class="pill" id="s-install-state"><span class="dot"></span><span>checking…</span></span>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px; margin-bottom:14px;">
+        <h3 style="margin-bottom:12px;">Restaurant</h3>
+        <div class="two-col">
+          <div>
+            <div class="form-row"><label>Name</label><input id="s-name"></div>
+            <div class="form-row"><label>Tagline</label><input id="s-tagline"></div>
+            <div class="form-row"><label>Address</label><input id="s-address"></div>
+            <div class="form-row"><label>Phone</label><input id="s-phone"></div>
+          </div>
+          <div>
+            <div class="form-row"><label>Currency symbol</label><input id="s-sym"></div>
+            <div class="form-row"><label>Secondary currency</label><input id="s-sec"></div>
+            <div class="form-row"><label>LBP per 1 USD</label><input id="s-rate" type="number"></div>
+            <div class="form-row"><label>Delivery fee (LBP)</label><input id="s-delivery" type="number"></div>
+            <div class="form-row"><label>Receipt footer</label><input id="s-footer"></div>
+            <div class="form-row"><label>Theme</label>
+              <select id="s-theme"><option value="light">light</option><option value="dark">dark</option></select></div>
+          </div>
+        </div>
+        <button class="btn primary" id="s-save">Save Settings</button>
+      </div>
+
+      <div class="card" style="padding:20px; margin-bottom:14px;">
+        <h3 style="margin-bottom:8px;">☁  Shared Database (multi-device sync)</h3>
+        <div class="faint" style="font-size:11px; margin-bottom:12px; line-height:1.6;">
+          All devices (up to 4+) share <b>one</b> cloud database: products, orders, sales,
+          customers, expenses, stock and settings stay identical everywhere in real time.<br>
+          Project: <b>${FIREBASE_CONFIG.projectId}</b> · Auth: anonymous.
+        </div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-fb-on"> Enable shared cloud database</label></div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 12px;">
+          <button class="btn primary" id="s-save-fb">Save cloud settings</button>
+          <button class="btn ghost" id="s-push-all">⬆ Push this device's data</button>
+          <button class="btn ghost" id="s-test-fb">Test connection</button>
+        </div>
+
+        <div style="margin-top:6px;">
+          <h3 style="margin-bottom:6px;">Sync diagnostics</h3>
+          <div class="diag" id="s-diag-sync">…</div>
+        </div>
+
+        <h3 style="margin:14px 0 6px;">Reporting collections (optional)</h3>
+        <div class="faint" style="font-size:11px; margin-bottom:8px;">
+          Used by the separate reporting push and the cloud print queue. Leave as-is unless you know why.
+        </div>
+        <div class="form-row"><label>Orders collection</label><input id="s-fb-orders"></div>
+        <div class="form-row"><label>Customers collection</label><input id="s-fb-cust"></div>
+        <div class="form-row"><label>Close-cash collection</label><input id="s-fb-cash"></div>
+        <div class="form-row"><label>Print jobs collection</label><input id="s-fb-jobs"></div>
+        <div class="diag" id="s-diag-fb">…</div>
+      </div>
+
+      <div class="card" style="padding:20px; margin-bottom:14px;">
+        <h3 style="margin-bottom:8px;">🖨  Thermal Printer (ESC/POS + cut)</h3>
+        <div class="faint" style="font-size:11px; margin-bottom:12px; line-height:1.6;">
+          <b>browser</b> — OS print dialog (no real cut).<br>
+          <b>usb</b> — raw ESC/POS via WebUSB. Real cut. Desktop Chrome/Edge only, HTTPS/localhost.<br>
+          <b>agent</b> — POST raw bytes to a Print Agent on your LAN (works on phone while on store Wi-Fi).<br>
+          <b>cloud</b> — queue the job in Firestore; agent at the store picks it up. Works from anywhere.
+        </div>
+
+        <div class="form-row"><label>Printer mode</label>
+          <div class="seg" id="s-mode-seg">
+            <button data-mode="browser">browser</button>
+            <button data-mode="usb">usb</button>
+            <button data-mode="agent">agent</button>
+            <button data-mode="cloud">cloud</button>
+          </div>
+        </div>
+
+        <div class="form-row"><label>Printer name</label>
+          <input id="s-printer" placeholder="e.g. EPSON TM-T20III"></div>
+        <div class="form-row"><label>Copies</label>
+          <select id="s-copies"><option value="1">1</option><option value="2">2</option></select></div>
+        <div class="form-row"><label>Cut</label>
+          <select id="s-cut">
+            <option value="partial">partial (recommended)</option>
+            <option value="full">full</option>
+            <option value="none">none</option>
+          </select></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-drawer"> Kick cash drawer on print</label></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-auto"> Auto-print after payment</label></div>
+        <div class="form-row"><label>Print Agent URL</label>
+          <input id="s-agent-url" placeholder="http://192.168.1.50:17777"></div>
+        <div class="form-row"><label>Agent token (optional)</label>
+          <input id="s-agent-token" placeholder="shared secret"></div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <button class="btn primary" id="s-save-printer">Save printer</button>
+          <button class="btn" id="s-usb-connect">🔌 Connect USB</button>
+          <button class="btn ghost" id="s-usb-disconnect">Disconnect USB</button>
+          <button class="btn ghost" id="s-test-usb">Test USB</button>
+          <button class="btn ghost" id="s-test-agent">Test agent</button>
+          <button class="btn ghost" id="s-test-cloud">Test cloud</button>
+        </div>
+
+        <div style="margin-top:14px;">
+          <h3 style="margin-bottom:6px;">Diagnostics</h3>
+          <div class="diag" id="s-diag">…</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <h3 style="flex:1;">👤 Users</h3>
+          <button class="btn" id="s-add-user">+ Add User</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Username</th><th>Full name</th><th>Role</th>
+              <th style="width:130px;">Actions</th></tr></thead>
+            <tbody id="s-users-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+
+    const S = DB.settings;
+    const $ = id => document.getElementById(id);
+
+    $("s-name").value     = S.restaurant_name || "";
+    $("s-tagline").value  = S.tagline || "";
+    $("s-address").value  = S.address || "";
+    $("s-phone").value    = S.phone || "";
+    $("s-sym").value      = S.currency_symbol || "";
+    $("s-sec").value      = S.secondary_currency || "";
+    $("s-rate").value     = S.secondary_rate || "90000";
+    $("s-delivery").value = S.delivery_fee || "0";
+    $("s-footer").value   = S.receipt_footer || "";
+    $("s-theme").value    = S.theme || "light";
+
+    $("s-printer").value     = S.printer_name || "";
+    $("s-copies").value      = S.printer_copies || "2";
+    $("s-cut").value         = S.printer_cut || "partial";
+    $("s-drawer").checked    = S.printer_drawer === "1";
+    $("s-auto").checked      = S.printer_auto === "1";
+    $("s-agent-url").value   = S.printer_agent_url || "";
+    $("s-agent-token").value = S.printer_agent_token || "";
+
+    $("s-fb-on").checked   = S.firebase_enabled === "1";
+    $("s-fb-orders").value = S.firebase_collection_orders || "orders";
+    $("s-fb-cust").value   = S.firebase_collection_customers || "customers";
+    $("s-fb-cash").value   = S.firebase_collection_cash || "close_cash";
+    $("s-fb-jobs").value   = S.firebase_collection_print_jobs || "print_jobs";
+
+    let currentMode = S.printer_mode || "browser";
+    const seg = $("s-mode-seg");
+    const paintSeg = ()=>{
+      seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.mode === currentMode));
+    };
+    paintSeg();
+    seg.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        currentMode = b.dataset.mode;
+        S.printer_mode = currentMode;
+        DB.save("settings");
+        Persist.putObject("settings", S);
+        paintSeg();
+        refreshDiag();
+      });
+    });
+
+    const refreshPill = ()=>{
+      const pill = document.getElementById("printer-pill");
+      const txt  = document.getElementById("printer-pill-txt");
+      if (!pill || !txt) return;
+      pill.classList.remove("ok","bad","warn");
+      if (currentMode === "usb"){
+        if (!USBPrinter.isSupported()){ pill.classList.add("bad"); txt.textContent = "USB n/a"; }
+        else if (USBPrinter.isConnected()){ pill.classList.add("ok"); txt.textContent = "USB ready"; }
+        else { pill.classList.add("warn"); txt.textContent = "USB off"; }
+      } else if (currentMode === "agent"){
+        pill.classList.add(S.printer_agent_url ? "ok" : "warn");
+        txt.textContent = S.printer_agent_url ? "Agent" : "Agent ?";
+      } else if (currentMode === "cloud"){
+        pill.classList.add(S.firebase_enabled === "1" ? "ok" : "bad");
+        txt.textContent = S.firebase_enabled === "1" ? "Cloud" : "Cloud off";
+      } else {
+        txt.textContent = "Browser";
+      }
+    };
+
+    const refreshDiag = ()=>{
+      const el_ = $("s-diag");
+      if (!el_) return;
+      const secure = isSecureContext_();
+      const usbSup = USBPrinter.isSupported();
+      const usbCon = USBPrinter.isConnected();
+      const fbOn   = S.firebase_enabled === "1";
+      const lines = [
+        `Mode: ${currentMode}`,
+        `Secure context: ${secure ? '<span class="ok">yes</span>' : '<span class="bad">no</span> (needed for WebUSB & crypto & PWA install)'}`,
+        `crypto.subtle: ${(crypto && crypto.subtle) ? '<span class="ok">available</span>' : '<span class="warn">fallback used</span>'}`,
+        `WebUSB supported: ${usbSup ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `USB connected: ${usbCon ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Agent URL: ${S.printer_agent_url ? escapeHtml(S.printer_agent_url) : '<span class="warn">not set</span>'}`,
+        `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Print jobs collection: ${escapeHtml(S.firebase_collection_print_jobs || "print_jobs")}`,
+        `Copies: ${escapeHtml(String(S.printer_copies||"2"))} · Cut: ${escapeHtml(S.printer_cut||"partial")} · Drawer: ${S.printer_drawer==="1"?"on":"off"}`,
+      ];
+      el_.innerHTML = lines.join("\n");
+    };
+
+    const refreshSyncDiag = ()=>{
+      const el_ = $("s-diag-sync");
+      if (!el_) return;
+      const online = navigator.onLine;
+      el_.innerHTML = [
+        `Enabled: ${S.firebase_enabled === "1" ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Connection: ${CloudDB.ready ? '<span class="ok">connected</span>' : '<span class="bad">not connected</span>'}`,
+        `Last error: ${CloudDB.error ? '<span class="bad">' + escapeHtml(CloudDB.error) + '</span>' : '<span class="ok">none</span>'}`,
+        `Browser online: ${online ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `Project: ${escapeHtml(FIREBASE_CONFIG.projectId)}`,
+        `Device UID: ${escapeHtml(CloudDB.uid || "—")}`,
+        `Records: products ${DB.products.length} · customers ${DB.customers.length} · orders ${DB.orders.length} · lines ${DB.order_items.length} · expenses ${DB.expenses.length}`,
+      ].join("\n");
+    };
+
+    const refreshFbDiag = ()=>{
+      const el_ = $("s-diag-fb");
+      if (!el_) return;
+      const fbOn = S.firebase_enabled === "1";
+      el_.innerHTML = [
+        `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Auth (anonymous): ${CloudDB.uid ? '<span class="ok">signed in</span>' : '<span class="warn">not signed in</span>'}`,
+        `Project: ${escapeHtml(FIREBASE_CONFIG.projectId)}`,
+        `Orders: ${escapeHtml(S.firebase_collection_orders || "orders")}`,
+        `Customers: ${escapeHtml(S.firebase_collection_customers || "customers")}`,
+        `Close cash: ${escapeHtml(S.firebase_collection_cash || "close_cash")}`,
+        `Print jobs: ${escapeHtml(S.firebase_collection_print_jobs || "print_jobs")}`,
+      ].join("\n");
+    };
+
+    /* ── install button inside Settings ── */
+    const refreshInstallRow = ()=>{
+      const btn   = $("s-install");
+      const state = $("s-install-state");
+      if (!btn || !state) return;
+      const txt = state.querySelector("span:last-child");
+      state.classList.remove("ok","bad","warn");
+      if (isStandalone()){
+        state.classList.add("ok"); if (txt) txt.textContent = "Installed";
+        btn.disabled = true;
+      } else if (!isSecureContext_()){
+        state.classList.add("bad"); if (txt) txt.textContent = "Needs HTTPS";
+        btn.disabled = false;
+      } else if (PWA.deferredPrompt){
+        state.classList.add("ok"); if (txt) txt.textContent = "Ready to install";
+        btn.disabled = false;
+      } else {
+        state.classList.add("warn"); if (txt) txt.textContent = "Manual install";
+        btn.disabled = false;
+      }
+    };
+    if ($("s-install")){
+      $("s-install").addEventListener("click", ()=>{
+        PWA.requestInstall();
+        setTimeout(refreshInstallRow, 400);
+      });
+    }
+
+    const refreshAll = ()=>{ refreshPill(); refreshDiag(); refreshSyncDiag(); refreshFbDiag(); refreshInstallRow(); };
+    refreshAll();
+
+    if (this._timer) clearInterval(this._timer);
+    this._timer = setInterval(()=>{
+      if (!document.body.contains($("s-diag"))){ clearInterval(this._timer); this._timer = null; return; }
+      refreshAll();
+    }, 1500);
+
+    const pill = document.getElementById("printer-pill");
+    if (pill && !pill._bound){
+      pill._bound = true;
+      pill.addEventListener("click", ()=>{
+        App.nav("settings");
+        setTimeout(()=>{ refreshAll(); $("s-diag")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
+      });
+    }
+    const cpill = document.getElementById("cloud-pill");
+    if (cpill && !cpill._bound){
+      cpill._bound = true;
+      cpill.addEventListener("click", ()=>{
+        App.nav("settings");
+        setTimeout(()=>{ refreshAll(); $("s-diag-sync")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
+      });
+    }
+
+    $("s-save").addEventListener("click", ()=>{
+      S.restaurant_name = $("s-name").value;
+      S.tagline         = $("s-tagline").value;
+      S.address         = $("s-address").value;
+      S.phone           = $("s-phone").value;
+      S.currency_symbol = $("s-sym").value;
+      S.secondary_currency = $("s-sec").value;
+      S.secondary_rate  = $("s-rate").value;
+      S.delivery_fee    = $("s-delivery").value;
+      S.receipt_footer  = $("s-footer").value;
+      const newTheme = $("s-theme").value;
+      const oldTheme = S.theme;
+      S.theme = newTheme;
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Settings saved — synced to all devices", "success");
+      if (newTheme !== oldTheme) App.applyTheme(newTheme);
+      POSPage.refreshCategories(); POSPage.renderProducts(); POSPage.recalc();
+    });
+
+    $("s-save-printer").addEventListener("click", ()=>{
+      S.printer_mode      = currentMode;
+      S.printer_name      = $("s-printer").value.trim();
+      S.printer_copies    = $("s-copies").value;
+      S.printer_cut       = $("s-cut").value;
+      S.printer_drawer    = $("s-drawer").checked ? "1" : "0";
+      S.printer_auto      = $("s-auto").checked ? "1" : "0";
+      S.printer_agent_url = $("s-agent-url").value.trim();
+      S.printer_agent_token = $("s-agent-token").value.trim();
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Printer settings saved", "success");
+      refreshAll();
+    });
+
+    $("s-save-fb").addEventListener("click", async ()=>{
+      S.firebase_enabled = $("s-fb-on").checked ? "1" : "0";
+      S.firebase_collection_orders    = $("s-fb-orders").value || "orders";
+      S.firebase_collection_customers = $("s-fb-cust").value   || "customers";
+      S.firebase_collection_cash      = $("s-fb-cash").value   || "close_cash";
+      S.firebase_collection_print_jobs= $("s-fb-jobs").value   || "print_jobs";
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Cloud settings saved", "success");
+
+      if (S.firebase_enabled === "1" && !CloudDB.ready){
+        toast("Connecting…", "info");
+        await CloudDB.init();
+        if (CloudDB.ready){
+          try{ await DB._fetchCloud(); }catch(e){}
+          Realtime.start();
+        }
+      }
+      refreshAll();
+    });
+
+    $("s-push-all").addEventListener("click", ()=>{
+      if (S.firebase_enabled !== "1"){ toast("Enable the shared database first", "warning"); return; }
+      if (!CloudDB.ready){ toast("Not connected to the cloud database", "error"); return; }
+      if (!confirm("Upload THIS device's products, orders, customers, expenses and settings to the shared database?\n\n" +
+                   "Records with the same ID will be overwritten on all devices.")) return;
+      DB.pushAllToCloud();
+      toast("Uploading local data to the shared database…", "info", 4000);
+    });
+
+    $("s-test-fb").addEventListener("click", async ()=>{
+      const res = await FirebaseSync.pushDocument(
+        $("s-fb-orders").value || "orders",
+        { test:true, message:"Hello from Pizza POS", created_at: nowIso() });
+      if (res.ok) toast(`Shared database OK (${res.info})`, "success");
+      else toast("Database test failed: " + res.info, "error", 6000);
+      refreshAll();
+    });
+
+    $("s-usb-connect").addEventListener("click", async ()=>{
+      try{
+        const info = await USBPrinter.connect();
+        toast(`USB connected (VID ${info.vid} PID ${info.pid})`, "success");
+        refreshAll();
+      }catch(e){
+        toast("USB connect failed: " + e.message, "error", 6000);
+        refreshAll();
+      }
+    });
+    $("s-usb-disconnect").addEventListener("click", async ()=>{
+      await USBPrinter.disconnect();
+      toast("USB printer disconnected", "info");
+      refreshAll();
+    });
+    $("s-test-usb").addEventListener("click", async ()=>{
+      if (!USBPrinter.isConnected()){ toast("Connect USB first", "warning"); return; }
+      try{
+        const bytes = buildEscPosReceipt(sampleReceipt(), S, "TEST PRINT");
+        await USBPrinter.send(bytes);
+        toast("Test sent to USB printer", "success");
+      }catch(e){ toast("USB print failed: " + e.message, "error", 6000); }
+    });
+    $("s-test-agent").addEventListener("click", async ()=>{
+      const url = ($("s-agent-url").value || "").trim();
+      if (!url){ toast("Enter the agent URL first", "warning"); return; }
+      try{
+        const r = await fetch(url.replace(/\/+$/,"") + "/health", { method:"GET" });
+        if (r.ok) toast("Agent reachable (" + r.status + ")", "success");
+        else toast("Agent responded " + r.status, "warning");
+      }catch(e){ toast("Agent unreachable: " + e.message, "error", 6000); }
+    });
+    $("s-test-cloud").addEventListener("click", async ()=>{
+      if (S.firebase_enabled !== "1"){ toast("Enable the shared database first", "warning"); return; }
+      try{
+        await CloudSync.queuePrintJob({
+          printer_name: S.printer_name || "",
+          order_no: "TEST-CLOUD",
+          cut: S.printer_cut || "partial",
+          drawer: S.printer_drawer === "1",
+          copies: 1,
+          data: Array.from(buildEscPosReceipt(sampleReceipt(), S, "CLOUD TEST")),
+        });
+        toast("Cloud test job queued (check your agent's console)", "success", 5000);
+      }catch(e){ toast("Cloud test failed: " + e.message, "error", 6000); }
+    });
+
+    $("s-add-user").addEventListener("click", async ()=>{
+      const u = prompt("Username:"); if (!u) return;
+      const p = prompt("Password:"); if (!p) return;
+      const n = prompt("Full name:") || "";
+      const r = prompt("Role (cashier/manager/admin):", "cashier") || "cashier";
+      try{
+        await DB.addUser(u.trim(), p, n, r);
+        this.renderUsers();
+        toast("User added — synced to all devices", "success");
+      }catch(e){ toast("Username already exists", "warning"); }
+    });
+
+    this.renderUsers();
+  },
+  renderUsers(){
+    const tb = document.getElementById("s-users-tbody");
+    if (!tb) return;
+    tb.innerHTML = DB.users.map(u=>`
+      <tr data-id="${u.id}">
+        <td>${escapeHtml(u.username)}</td>
+        <td>${escapeHtml(u.full_name||"")}</td>
+        <td>${escapeHtml(u.role||"")}</td>
+        <td>${u.username === "admin" ? "" :
+          `<button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>`}</td>
+      </tr>`).join("");
+    tb.querySelectorAll("button[data-act=del]").forEach(b=>{
+      const id = Number(b.closest("tr").dataset.id);
+      b.addEventListener("click", ()=>{
+        if (confirm("Delete this user?")){
+          DB.deleteUser(id);
+          DB.saveAll();
+          this.renderUsers();
+        }
+      });
+    });
+  },
+};
+
+function sampleReceipt(){
+  return {
+    no:"TEST-0001", type:"Delivery",
+    customer_name:"Test Customer", customer_phone:"+961 71 234 567",
+    items:[
+      {name:"Margherita Pizza", qty:1, unit:1100000, line:1100000,
+        options:[{label:"Large"},{label:"Margherita"},{label:"Pepperoni"},
+                 {label:"Without Olive"},{label:"Without Oregano"},{label:"Without Sauce"}],
+        note:"Extra cheese on top"},
+      {name:"Chicken BBQ Pizza", qty:1, unit:1200000, line:1200000, options:[], note:""},
+      {name:"Cheese Garlic Fingers", qty:1, unit:700000, line:700000,
+        options:[{label:"Medium"}], note:""},
+      {name:"Chicken Wings", qty:1, unit:800000, line:800000,
+        options:[{label:"12 pcs + Fries"}], note:"Extra spicy"},
+      {name:"Chicken Strips", qty:1, unit:1300000, line:1300000,
+        options:[{label:"10 pcs"}], note:""},
+      {name:"Special Offer (5 pcs + Fries + Pepsi)", qty:1, unit:1000000, line:1000000, options:[], note:""},
+      {name:"Fries", qty:1, unit:600000, line:600000, options:[{label:"XXL"}], note:""},
+      {name:"Soft Drink", qty:2, unit:100000, line:200000, options:[{label:"300ml"}], note:""},
+    ],
+    subtotal:7000000, discount:0, tax:0, delivery:270000, total:7270000,
+    payment_method:"Cash",
+  };
+}
+
+/* ═══════════════════ FIREBASE REST (reporting / cloud print) ═══════════════════ */
+function _firestoreValue(v){
+  if (v === null || v === undefined) return { nullValue:null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number"){
+    if (Number.isInteger(v)) return { integerValue: String(v) };
+    return { doubleValue: v };
+  }
+  if (typeof v === "string") return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(_firestoreValue) } };
+  if (typeof v === "object"){
+    const fields = {};
+    for (const k of Object.keys(v)) fields[k] = _firestoreValue(v[k]);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+function _firestoreDoc(obj){
+  const fields = {};
+  for (const k of Object.keys(obj)) fields[k] = _firestoreValue(obj[k]);
+  return { fields };
+}
+
+const FirebaseSync = {
+  _idToken: null,
+  _authError: null,
+
+  async _token(){
+    /* Prefer the token already held by the shared-database session */
+    const t = await CloudDB.token();
+    if (t) return t;
+    if (this._idToken) return this._idToken;
+    return await this._signInAnonymous();
+  },
+
+  async _signInAnonymous(){
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_CONFIG.apiKey}`;
+    try{
+      const r = await fetch(url, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ returnSecureToken:true }),
+      });
+      const data = await r.json();
+      if (data && data.idToken){
+        this._idToken = data.idToken;
+        this._authError = null;
+        return this._idToken;
+      }
+      this._idToken = null;
+      this._authError = data && data.error ? (data.error.message || "auth failed") : "no token";
+    }catch(e){
+      this._idToken = null;
+      this._authError = String(e);
+    }
+    return null;
+  },
+
+  async pushDocument(collection, data){
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/${collection}?key=${FIREBASE_CONFIG.apiKey}`;
+    const token = await this._token();
+    const headers = { "Content-Type":"application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    try{
+      const r = await fetch(url, {
+        method:"POST", headers, body: JSON.stringify(_firestoreDoc(data)),
+      });
+      if (r.ok){
+        const j = await r.json().catch(()=> ({}));
+        const name = j && j.name ? j.name.split("/").pop() : "";
+        return { ok:true, info:"HTTP " + r.status, id:name };
+      }
+      const detail = await r.text();
+      let hint = "";
+      if (r.status === 403){
+        hint = token
+          ? " (rules denied write — check Firestore rules)"
+          : " (anonymous auth disabled — enable it in Firebase Console)";
+      }
+      return { ok:false, info:`HTTP ${r.status}${hint}: ${detail.slice(0,220)}` };
+    }catch(e){
+      return { ok:false, info: String(e) };
+    }
+  },
+};
+
+const CloudSync = {
+  _warned: false,
+  enabled(){ return DB.settings.firebase_enabled === "1"; },
+  _col(key, def){ return (DB.settings[key] || def || "").trim() || def; },
+
+  async pushOrder(o){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    const doc = {
+      order_no: o.no, order_type: o.type, customer: o.customer_name||"",
+      customer_id: o.customer_id||null, customer_phone: o.customer_phone||"",
+      subtotal: +o.subtotal||0, discount: +o.discount||0,
+      delivery: +o.delivery||0, total: +o.total||0,
+      currency: (DB.settings.currency_symbol||"LBP ").trim(),
+      payment: o.payment_method||"Cash",
+      created_at: nowIso(),
+      items: (o.items||[]).map(i=>({
+        name:i.name||"", qty:+i.qty||1, unit:+i.unit||0, line:+i.line||0,
+        options:(i.options||[]).map(x=>x.label||""), note:i.note||"",
+      })),
+    };
+    const res = await FirebaseSync.pushDocument(this._col("firebase_collection_orders","orders"), doc);
+    if (!res.ok && this.enabled() && !this._warned){
+      this._warned = true;
+      console.warn("Cloud sync failed:", res.info);
+    }
+    return res;
+  },
+
+  async pushCustomer(c){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    return await FirebaseSync.pushDocument(
+      this._col("firebase_collection_customers","customers"),
+      { name:c.name||"", phone:c.phone||"", address:c.address||"", created_at: nowIso() });
+  },
+
+  async pushCloseCash(start, end){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    const cash = DB.cashSummary(start, end);
+    return await FirebaseSync.pushDocument(
+      this._col("firebase_collection_cash","close_cash"),
+      { from:start, to:end, cash_orders:cash.cash_orders, cash_sales:cash.cash_sales,
+        expenses:cash.expenses, expected:cash.expected,
+        currency:(DB.settings.currency_symbol||"LBP ").trim(), created_at: nowIso() });
+  },
+
+  async queuePrintJob(job){
+    if (!this.enabled()) throw new Error("Firebase disabled");
+    const col = this._col("firebase_collection_print_jobs", "print_jobs");
+    const doc = {
+      printer_name: job.printer_name || "",
+      order_no: job.order_no || "",
+      cut: job.cut || "partial",
+      drawer: job.drawer === true,
+      copies: job.copies || 1,
+      data: job.data || [],
+      status: "pending",
+      source: "pizza_pos_web",
+      created_at: nowIso(),
+    };
+    const res = await FirebaseSync.pushDocument(col, doc);
+    if (!res.ok) throw new Error(res.info);
+    return res;
+  },
+};
+
+/* ═══════════════════ PWA INSTALLER ═══════════════════
+   Everything needed so a remote phone (Android or iOS) can
+   "Install / Add to Home Screen" and then run Pizza POS
+   full-screen, with an offline-cached shell.                        */
+const PWA = {
+  deferredPrompt: null,
+  _swRegistered: false,
+
+  isIOS(){
+    const ua = navigator.userAgent || "";
+    return /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  },
+  isAndroid(){ return /Android/i.test(navigator.userAgent || ""); },
+  isStandalone(){
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.matchMedia("(display-mode: fullscreen)").matches ||
+           window.matchMedia("(display-mode: minimal-ui)").matches ||
+           window.navigator.standalone === true;
+  },
+
+  /* ── generated app icons (emoji on brand background) ── */
+  makeIcon(size, maskable){
+    const c = document.createElement("canvas");
+    c.width = size; c.height = size;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#0f172a";
+    if (!maskable && ctx.roundRect){
+      const r = size * 0.18;
+      ctx.beginPath(); ctx.roundRect(0, 0, size, size, r); ctx.fill();
+    } else {
+      ctx.fillRect(0, 0, size, size);
+    }
+    const pad = maskable ? size * 0.22 : 0;
+    const glyph = size - pad * 2;
+    ctx.font = `${Math.round(glyph * 0.86)}px "Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    try { ctx.fillText("🍕", size/2, size/2 + glyph * 0.05); } catch(e){}
+    return c.toDataURL("image/png");
+  },
+
+  /* ── build & attach the web app manifest ──
+     IMPORTANT: every URL inside the manifest is ABSOLUTE, because
+     the manifest itself is served from a blob: URL. Relative paths
+     would resolve against the blob and break on remote devices.     */
+  attachManifest(){
+    let icon192 = "", icon512 = "", icon512m = "";
+    try{
+      icon192  = this.makeIcon(192, false);
+      icon512  = this.makeIcon(512, false);
+      icon512m = this.makeIcon(512, true);
+    }catch(e){ console.warn("icon generation failed", e); }
+
+    const dir  = new URL(".", location.href).href;              // folder of this page
+    const self_ = location.origin + location.pathname + location.search;
+
+    const manifest = {
+      id: dir,
+      name: "Pizza POS — Restaurant Management Suite",
+      short_name: "PizzaPOS",
+      description: "Pizza POS — Restaurant Management Suite. Sell, print and track from any phone.",
+      lang: "en",
+      dir: "ltr",
+      start_url: self_,
+      scope: dir,
+      display: "standalone",
+      display_override: ["standalone", "minimal-ui"],
+      orientation: "any",
+      background_color: "#f4f6f9",
+      theme_color: "#0f172a",
+      categories: ["business", "productivity", "food"],
+      prefer_related_applications: false,
+      icons: [
+        { src: icon192,  sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: icon512,  sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: icon512m, sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ],
+    };
+
+    let href = "";
+    try{
+      href = URL.createObjectURL(new Blob(
+        [JSON.stringify(manifest)],
+        { type: "application/manifest+json" }
+      ));
+    }catch(e){}
+
+    if (href){
+      let link = document.querySelector('link[rel="manifest"]');
+      if (!link){
+        link = document.createElement("link");
+        link.rel = "manifest";
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    }
+
+    /* iOS ignores the manifest for icons — it needs apple-touch-icon */
+    try{
+      let ati = document.querySelector('link[rel="apple-touch-icon"]');
+      if (!ati){
+        ati = document.createElement("link");
+        ati.rel = "apple-touch-icon";
+        document.head.appendChild(ati);
+      }
+      ati.setAttribute("sizes", "180x180");
+      ati.href = icon192 || icon512;
+    }catch(e){}
+  },
+
+  /* ── register an (optional) service worker ──
+     If a companion `sw.js` is deployed next to this page it will be
+     used for offline caching. If it isn't there we quietly skip it —
+     nothing else depends on it. */
+  async registerServiceWorker(){
+    if (this._swRegistered) return;
+    if (!("serviceWorker" in navigator)) return;
+    if (!isSecureContext_()) return;
+    try{
+      const probe = await fetch("sw.js", { method:"HEAD" }).catch(()=> null);
+      if (!probe || !probe.ok) return;
+      await navigator.serviceWorker.register("sw.js", { scope: "./" });
+      this._swRegistered = true;
+      console.info("[PWA] service worker registered — offline mode available");
+    }catch(e){
+      console.info("[PWA] service worker skipped:", e && e.message);
+    }
+  },
+
+  /* ── the install button in the top bar ── */
+  bindInstallButton(){
+    const btn = document.getElementById("install-btn");
+    if (!btn || btn._bound) return;
+    btn._bound = true;
+    btn.addEventListener("click", ()=>this.requestInstall());
+    this.refreshButton();
+  },
+
+  refreshButton(){
+    const btn = document.getElementById("install-btn");
+    if (!btn) return;
+    if (this.isStandalone()){ btn.classList.remove("show"); btn.title = "Already installed"; return; }
+    btn.classList.add("show");
+    btn.title = this.deferredPrompt ? "Install Pizza POS" : "How to install Pizza POS";
+  },
+
+  async requestInstall(){
+    if (this.isStandalone()){
+      toast("Pizza POS is already installed on this device.", "success");
+      return;
+    }
+    if (this.deferredPrompt){
+      const prompt = this.deferredPrompt;
+      this.deferredPrompt = null;
+      try{
+        prompt.prompt();
+        const choice = await prompt.userChoice;
+        if (choice && choice.outcome === "accepted"){
+          toast("Installing Pizza POS…", "success");
+        } else {
+          toast("Install dismissed — you can try again any time.", "info");
+        }
+      }catch(e){}
+      this.refreshButton();
+      return;
+    }
+    this.showInstallHelp();
+  },
+
+  /* ── step-by-step help for phones that don't fire beforeinstallprompt ── */
+  showInstallHelp(){
+    const secure = isSecureContext_();
+    let steps;
+    if (this.isIOS()){
+      steps = [
+        "Open this page in <b>Safari</b> (Chrome / Firefox on iPhone cannot install web apps).",
+        "Tap the <b>Share</b> icon <b>⎋</b> in the bottom toolbar.",
+        "Scroll the sheet and tap <b>Add to Home Screen</b>.",
+        "Name it <b>Pizza POS</b> and tap <b>Add</b>."
+      ];
+    } else if (this.isAndroid()){
+      steps = [
+        "Open the browser menu <b>⋮</b> (top-right of Chrome).",
+        "Tap <b>Install app</b> — or <b>Add to Home screen</b> if you don't see it.",
+        "Confirm with <b>Install</b>.",
+        "Pizza POS opens full-screen from your home screen."
+      ];
+    } else {
+      steps = [
+        "Look for the <b>install</b> icon <b>⊕</b> in your browser's address bar.",
+        "Or open the browser menu and choose <b>Install Pizza POS</b>.",
+        "Confirm the prompt.",
+        "The app then runs in its own window, with its own icon."
+      ];
+    }
+
+    Modal.open(`<div class="m-head"><h1>📲  Install Pizza POS</h1></div>
+      <div class="m-body">
+        <div class="muted" style="font-size:12px; margin-bottom:10px;">
+          Installing puts Pizza POS on your home screen and lets it open full-screen,
+          without the browser bars — and it keeps working when the network drops.
+        </div>
+        <ol class="install-steps">${steps.map(s=>`<li>${s}</li>`).join("")}</ol>
+        ${ secure ? "" : `
+          <div class="install-warn">
+            ⚠ <b>This page is not served over HTTPS.</b> Phones only allow app installation
+            from a secure origin. Host the file on any HTTPS address (Netlify, Vercel,
+            GitHub Pages, Firebase Hosting…) and open that link on the phone.
+          </div>` }
+      </div>
+      <div class="m-foot">
+        <button class="btn primary" id="pwa-help-close">Got it</button>
+      </div>`);
+    document.getElementById("pwa-help-close").addEventListener("click", ()=>Modal.close());
+  },
+
+  /* ── wire everything up ── */
+  setup(){
+    this.attachManifest();
+    this.bindInstallButton();
+
+    window.addEventListener("beforeinstallprompt", (e)=>{
+      e.preventDefault();
+      this.deferredPrompt = e;
+      this.refreshButton();
+    });
+
+    window.addEventListener("appinstalled", ()=>{
+      this.deferredPrompt = null;
+      this.refreshButton();
+      toast("Pizza POS installed 🍕", "success");
+    });
+
+    /* React to the user entering / leaving standalone mode */
+    const mq = window.matchMedia("(display-mode: standalone)");
+    const onChange = ()=>this.refreshButton();
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+
+    this.registerServiceWorker();
+  },
+};
+
+/* ═══════════════════ APP ═══════════════════ */
+const App = {
+  user: null,
+  page: "pos",
+  _pagesInited: false,
+  _syncTimer: null,
+
+  async init(){
+    PWA.setup();
+
+    const status = document.getElementById("login-cloud");
+    await DB.load(msg => { if (status) status.textContent = msg ? "☁ " + msg : ""; });
+
+    this.applyTheme(DB.settings.theme || "light");
+    this.bindLogin();
+    this.bindMisc();
+    SyncStatus.render();
+
+    if (status){
+      if (CloudDB.ready){
+        status.innerHTML = "☁ Shared database connected — data syncs across all devices.";
+      } else if (DB.settings.firebase_enabled === "1"){
+        status.innerHTML = "⚠ Shared database unavailable — running on this device's local copy.<br>" +
+          "<span class='faint'>" + escapeHtml(CloudDB.error || "") + "</span>";
+      } else {
+        status.textContent = "Local-only mode (cloud database disabled in Settings).";
+      }
+    }
+  },
+
+  bindLogin(){
+    const btn = document.getElementById("login-btn");
+    const onEnter = e => { if (e.key === "Enter") btn.click(); };
+    document.getElementById("login-user").addEventListener("keydown", onEnter);
+    document.getElementById("login-pass").addEventListener("keydown", onEnter);
+    btn.addEventListener("click", async ()=>{
+      const u = document.getElementById("login-user").value.trim();
+      const p = document.getElementById("login-pass").value;
+      const err = document.getElementById("login-err");
+      err.textContent = "";
+      if (!u || !p){ err.textContent = "Enter username and password"; return; }
+      try{
+        const user = await DB.authenticate(u, p);
+        if (!user){ err.textContent = "Invalid credentials"; return; }
+        this.user = user;
+        this.start();
+      }catch(e){
+        err.textContent = "Login error: " + e.message;
+      }
+    });
+  },
+
+  bindMisc(){
+    const fab = document.getElementById("cart-fab");
+    if (fab) fab.addEventListener("click", ()=>POSPage.openCartSheet());
+    const refresh = ()=>{ POSPage.updateCartFab(); PWA.refreshButton(); };
+    window.addEventListener("resize", refresh);
+    window.addEventListener("orientationchange", ()=>setTimeout(refresh, 200));
+
+    window.addEventListener("online", ()=>{
+      SyncStatus.set(CloudDB.ready ? "synced" : "local",
+        CloudDB.ready ? "Back online" : "Offline — local data only");
+    });
+    window.addEventListener("offline", ()=>{
+      SyncStatus.set("local", "Offline — changes will sync when back online");
+    });
+
+    document.getElementById("theme-btn").addEventListener("click", ()=>{
+      const cur = DB.settings.theme || "light";
+      const next = cur === "light" ? "dark" : "light";
+      DB.settings.theme = next;
+      DB.save("settings");
+      Persist.putObject("settings", DB.settings);
+      this.applyTheme(next);
+      const sel = document.getElementById("s-theme");
+      if (sel) sel.value = next;
+    });
+
+    document.querySelectorAll(".navbtn").forEach(b=>{
+      b.addEventListener("click", ()=>this.nav(b.dataset.page));
+    });
+  },
+
+  start(){
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").classList.add("on");
+    const initials = (this.user.full_name || this.user.username)
+      .split(/\s+/).slice(0,2).map(x=>x[0].toUpperCase()).join("") || "US";
+    document.getElementById("user-avatar").textContent = initials;
+    document.getElementById("user-who").textContent =
+      `${this.user.full_name || this.user.username}  •  ${this.user.role}`;
+
+    if (!this._pagesInited){
+      try{ POSPage.init(); }catch(e){ console.error("POSPage.init", e); }
+      try{ ProductsPage.init(); }catch(e){ console.error("ProductsPage.init", e); }
+      try{ CustomersPage.init(); }catch(e){ console.error("CustomersPage.init", e); }
+      try{ ExpensesPage.init(); }catch(e){ console.error("ExpensesPage.init", e); }
+      try{ ReportsPage.init(); }catch(e){ console.error("ReportsPage.init", e); }
+      try{ SettingsPage.init(); }catch(e){ console.error("SettingsPage.init", e); }
+      this._pagesInited = true;
+    }
+    this.nav("pos");
+    PWA.refreshButton();
+  },
+
+  nav(page){
+    this.page = page;
+    document.querySelectorAll(".navbtn").forEach(b=>{
+      b.classList.toggle("active", b.dataset.page === page);
+    });
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("on"));
+    const el = document.getElementById("page-" + page);
+    if (el) el.classList.add("on");
+    const titles = { pos:"POS", products:"Products", customers:"Customers",
+                     expenses:"Expenses", reports:"Reports", settings:"Settings" };
+    document.getElementById("page-title").textContent = titles[page] || page;
+
+    try{
+      if (page === "pos"){
+        POSPage.renderTabs(); POSPage.renderProducts(); POSPage.recalc();
+        if (!isMobile()) POSPage.closeCartSheet();
+      } else if (page === "products") ProductsPage.render();
+      else if (page === "customers")  CustomersPage.render();
+      else if (page === "expenses")   ExpensesPage.render();
+      else if (page === "reports")    ReportsPage.render();
+      else if (page === "settings")   SettingsPage.renderUsers();
+    }catch(e){ console.error("nav render error:", e); }
+
+    POSPage.updateCartFab();
+  },
+
+  /* ── called whenever a remote change lands ── */
+  scheduleSyncRefresh(){
+    if (this._syncTimer) return;
+    this._syncTimer = setTimeout(()=>{
+      this._syncTimer = null;
+      this.refreshAfterSync();
+    }, 250);
+  },
+
+  refreshAfterSync(){
+    if (!this._pagesInited) return;
+    try{
+      if (this.page === "pos"){
+        POSPage.refreshCategories();
+        POSPage.renderProducts();
+        POSPage.renderTabs();
+      } else if (this.page === "products")  ProductsPage.render();
+      else if (this.page === "customers")   CustomersPage.render();
+      else if (this.page === "expenses")    ExpensesPage.render();
+      else if (this.page === "reports")     ReportsPage.render();
+      else if (this.page === "settings")    SettingsPage.renderUsers();
+    }catch(e){ console.warn("refreshAfterSync:", e); }
+  },
+
+  applyTheme(theme){
+    document.body.classList.toggle("dark", theme === "dark");
+    if (DB.settings) DB.settings.theme = theme;
+    const mt = document.querySelector('meta[name="theme-color"]');
+    if (mt) mt.setAttribute("content", theme === "dark" ? "#0a0f1c" : "#0f172a");
+  },
+};
+
+window.addEventListener("error", e=>{
+  console.error("Global error:", e.error || e.message);
+});
+window.addEventListener("unhandledrejection", e=>{
+  console.error("Unhandled rejection:", e.reason);
+});
+
+window.addEventListener("DOMContentLoaded", ()=>{
+  App.init().catch(err=>{
+    console.error("Init failed:", err);
+    const el = document.getElementById("login-err");
+    if (el) el.textContent = "Startup error: " + (err.message || err);
+    /* Never leave the operator locked out — fall back to local data. */
+    try{
+      if (!App._pagesInited){
+        App.bindLogin(); App.bindMisc();
+      }
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>
