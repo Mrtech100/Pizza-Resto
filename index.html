@@ -107,7 +107,7 @@ tbody tr:hover td{background:var(--surface2);}
 #login .err{color:var(--danger); font-size:11px; min-height:16px; margin-bottom:6px;}
 #login button{width:100%; padding:12px; font-size:14px; margin-top:6px;}
 #login .hint{color:var(--text3); font-size:11px; margin-top:14px;}
-#login .net{font-size:11px; margin-top:10px; color:var(--text3);}
+#login .cloud{margin-top:10px; font-size:11px;}
 
 .pos-left{display:flex; flex-direction:column; gap:10px; min-height:0; height:100%; min-width:0;}
 .pos-right{display:flex; flex-direction:column; padding:14px; gap:10px;
@@ -248,7 +248,7 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 
 .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px;
   border-radius:12px; font-size:11px; font-weight:700; border:1px solid var(--border);
-  background:var(--surface2); color:var(--text2); cursor:pointer; white-space:nowrap;}
+  background:var(--surface2); color:var(--text2); cursor:pointer; flex-shrink:0;}
 .pill .dot{width:8px; height:8px; border-radius:50%; background:var(--text3);}
 .pill.ok .dot{background:var(--success);}
 .pill.bad .dot{background:var(--danger);}
@@ -263,7 +263,7 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 .diag{background:var(--surface2); border:1px solid var(--border);
   border-radius:10px; padding:10px 12px; font-family:ui-monospace,monospace;
   font-size:11px; line-height:1.6; color:var(--text2); white-space:pre-wrap;
-  word-break:break-word; max-height:240px; overflow:auto;}
+  word-break:break-word; max-height:220px; overflow:auto;}
 .diag .ok{color:var(--success); font-weight:700;}
 .diag .bad{color:var(--danger); font-weight:700;}
 .diag .warn{color:var(--warn); font-weight:700;}
@@ -281,6 +281,8 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
   .topbar h1{font-size:15px;}
   #install-btn{display:none;}
   #install-btn.show{display:inline-flex;}
+  #user-who{display:none;}
+  .pill{padding:4px 8px; font-size:10px;}
   #page-pos.on{grid-template-columns:1fr; padding:8px; gap:8px;}
   .pos-left{padding:0;}
   .pos-right{position:fixed; top:0; left:0; right:0; bottom:0; z-index:80;
@@ -332,7 +334,7 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
     <div class="err" id="login-err"></div>
     <button class="btn primary" id="login-btn">Sign In</button>
     <div class="hint">Default: admin / admin123</div>
-    <div class="net" id="login-net">…</div>
+    <div class="hint cloud" id="login-cloud">☁ Connecting to shared database…</div>
   </div>
 </div>
 
@@ -351,8 +353,8 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
     <div class="topbar">
       <h1 id="page-title">POS</h1>
       <div class="spacer"></div>
-      <span class="pill" id="sync-pill" title="Cloud sync status">
-        <span class="dot"></span><span id="sync-pill-txt">Local</span>
+      <span class="pill" id="cloud-pill" title="Shared database status — click for details">
+        <span class="dot"></span><span id="cloud-pill-txt">Sync</span>
       </span>
       <span class="pill" id="printer-pill" title="Printer status — click for diagnostics">
         <span class="dot"></span><span id="printer-pill-txt">Printer</span>
@@ -383,37 +385,13 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 <div id="toasts"></div>
 <div id="receipt-area"></div>
 
+<!-- ═══════════ Firebase SDK (compat) — used for the shared multi-device database ═══════════ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
 <script>
 "use strict";
-
-/* ═══════════════════════════════════════════════════════════════
-   PIZZA POS — MULTI-DEVICE EDITION
-   ─────────────────────────────────────────────────────────────
-   Architecture
-   ------------
-   • Firestore is the single source of truth for ALL data:
-       pos_settings/main        restaurant config + printer + options
-       pos_categories/*         menu categories
-       pos_products/*           products (price, stock, options…)
-       pos_customers/*          customers
-       pos_orders/*             orders  (items embedded as an array)
-       pos_expenses/*           expenses
-       pos_users/*              login accounts (salted hash)
-       pos_meta/state           seed marker
-       pos_meta/counters        daily order-number counter
-       pos_print_jobs/*         cloud print queue (optional)
-
-   • Every device opens realtime onSnapshot listeners → when device A
-     creates a sale, adds a product or edits a price, devices B/C/D
-     update within ~200 ms without a reload.
-
-   • Firestore offline persistence (IndexedDB) is enabled, so each
-     device keeps working with no internet and re-syncs automatically.
-     Writes made offline are queued and flushed on reconnect.
-
-   • If Firebase cannot be reached (or cloud sync is switched off) the
-     app degrades to a fully functional LOCAL mode using localStorage.
-   ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const FIREBASE_CONFIG = {
@@ -425,20 +403,22 @@ const FIREBASE_CONFIG = {
   appId:"1:641877559339:web:b95061f96efe5da489026e",
 };
 
-const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
-
-/* Firestore collection names (keys match DB property names) */
-const CLOUD_COLLECTIONS = {
-  categories:"pos_categories",
-  products:  "pos_products",
-  customers: "pos_customers",
-  orders:    "pos_orders",
-  expenses:  "pos_expenses",
-  users:     "pos_users",
+/* ── Shared (multi-device) collections ─────────────────────────────
+   Every device reads/writes the SAME Firestore collections, so
+   products, orders, customers, expenses, settings and users stay
+   identical on all 3–4 devices in real time.                        */
+const COLLECTIONS = {
+  settings:    { name:"pos_settings",    single:true  },
+  users:       { name:"pos_users",       single:false },
+  categories:  { name:"pos_categories",  single:false },
+  products:    { name:"pos_products",    single:false },
+  customers:   { name:"pos_customers",   single:false },
+  orders:      { name:"pos_orders",      single:false },
+  order_items: { name:"pos_order_items", single:false },
+  expenses:    { name:"pos_expenses",    single:false },
+  stock_moves: { name:"pos_stock_moves", single:false },
 };
-const SETTINGS_PATH = ["pos_settings","main"];
-const META_PATH     = ["pos_meta","state"];
-const COUNTERS_PATH = ["pos_meta","counters"];
+const COLLECTION_KEYS = Object.keys(COLLECTIONS);
 
 const CHICKEN_BBQ_LARGE_PRICE = 1_200_000;
 
@@ -494,11 +474,10 @@ const DEFAULT_SETTINGS = {
   printer_agent_url:  "",
   printer_agent_token:"",
 
-  /* NOTE: firebase_enabled is a PER-DEVICE preference.
-     It is never written to the cloud, so turning sync off on one
-     device does not disconnect the others. */
-  firebase_enabled:"1",
-
+  firebase_enabled:"1",           // shared cloud database ON by default
+  firebase_collection_orders:"orders",
+  firebase_collection_customers:"customers",
+  firebase_collection_cash:"close_cash",
   firebase_collection_print_jobs:"print_jobs",
 
   options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1",
@@ -557,7 +536,7 @@ const CUSTOM_OPTIONS = {
   ],
 };
 
-/* ═══════════════════ STORAGE (local cache) ═══════════════════ */
+/* ═══════════════════ LOCAL CACHE (offline mirror) ═══════════════════ */
 const STORE = {
   prefix:"pizza_pos_",
   get(key, fallback=null){
@@ -568,9 +547,8 @@ const STORE = {
   },
   set(key, val){
     try{ localStorage.setItem(this.prefix + key, JSON.stringify(val)); }
-    catch(e){ console.warn("Storage write failed (quota?)", e); }
+    catch(e){ console.error("Storage full?", e); }
   },
-  del(key){ try{ localStorage.removeItem(this.prefix + key); }catch(e){} },
 };
 
 /* ═══════════════════ HELPERS ═══════════════════ */
@@ -580,10 +558,6 @@ function escapeHtml(s){
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 function cloneJson(o){ return JSON.parse(JSON.stringify(o)); }
-function uid(prefix){
-  return (prefix || "id") + "_" + Date.now().toString(36) +
-         Math.random().toString(36).slice(2, 9);
-}
 function fmtMoney(v, sym){
   sym = sym || (DB.settings && DB.settings.currency_symbol) || "LBP ";
   return sym + Math.round(Number(v)||0).toLocaleString("en-US");
@@ -613,21 +587,36 @@ function isSecureContext_(){
     (window.isSecureContext === true || location.protocol === "https:" ||
      location.hostname === "localhost" || location.hostname === "127.0.0.1");
 }
-function cleanForCloud(obj){
-  const out = {};
-  for (const k of Object.keys(obj || {})){
-    const v = obj[k];
-    if (v === undefined) continue;
-    out[k] = v;
-  }
-  return out;
+function withTimeout(promise, ms){
+  return new Promise((resolve, reject)=>{
+    const t = setTimeout(()=>reject(new Error("timeout")), ms);
+    promise.then(v=>{ clearTimeout(t); resolve(v); },
+                 e=>{ clearTimeout(t); reject(e); });
+  });
 }
-/* Normalise "options" which may be an array of {label} or a plain string */
-function optLabels(it){
-  if (Array.isArray(it.options)){
-    return it.options.map(o => (o && o.label != null) ? String(o.label) : String(o)).filter(Boolean);
+
+/* Globally unique numeric id — safe across devices.
+   ~1.7e15 max, well inside Number.MAX_SAFE_INTEGER, stays sortable by time. */
+let _idCounter = 0;
+function newId(){
+  _idCounter = (_idCounter + 1) % 1000;
+  return Date.now() * 1000 + ((_idCounter * 7 + Math.floor(Math.random() * 1000)) % 1000);
+}
+
+/* Firestore refuses `undefined`. Strip it out and guard NaN/Infinity. */
+function sanitize(obj){
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj && typeof obj === "object"){
+    const out = {};
+    for (const k of Object.keys(obj)){
+      const v = obj[k];
+      if (v === undefined) continue;
+      out[k] = sanitize(v);
+    }
+    return out;
   }
-  return String(it.options || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (typeof obj === "number" && !isFinite(obj)) return 0;
+  return obj;
 }
 
 /* ═══════════════════ TOAST ═══════════════════ */
@@ -664,10 +653,7 @@ document.getElementById("modal-bg").addEventListener("click", e=>{
   if (e.target.id === "modal-bg") Modal.close();
 });
 
-/* ═══════════════════ CRYPTO ═══════════════════
-   Hash format:  salt$<pbkdf2hex|->$<fallbackhex>
-   The weak fallback component is always stored so that a device
-   without crypto.subtle (plain http on the LAN) can still verify. */
+/* ═══════════════════ CRYPTO (with HTTP fallback) ═══════════════════ */
 const Crypto = {
   _buf2hex(buf){
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
@@ -680,7 +666,7 @@ const Crypto = {
       return Math.random().toString(36).slice(2) + Date.now().toString(36);
     }
   },
-  _fallbackHex(password, salt){
+  _fallbackHash(password, salt){
     const s = salt + "$" + password;
     let h1 = 0x811c9dc5, h2 = 0xc9dc5118;
     for (let i = 0; i < s.length; i++){
@@ -688,652 +674,646 @@ const Crypto = {
       h1 = ((h1 ^ c) * 16777619) >>> 0;
       h2 = ((h2 + c) * 2654435761) >>> 0;
     }
-    return h1.toString(16) + h2.toString(16);
-  },
-  async _pbkdf2Hex(password, salt){
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      "raw", enc.encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits(
-      { name:"PBKDF2", salt:enc.encode(salt), iterations:100_000, hash:"SHA-256" },
-      key, 256);
-    return this._buf2hex(bits);
+    return salt + "$fb$" + h1.toString(16) + h2.toString(16);
   },
   async hash(password, salt=null){
     if (!salt) salt = this._randomSalt();
-    const fb = this._fallbackHex(password, salt);
-    let strong = "-";
-    if (isSecureContext_() && typeof crypto !== "undefined" && crypto.subtle){
-      try{ strong = await this._pbkdf2Hex(password, salt); }catch(e){ strong = "-"; }
+    if (!isSecureContext_() || !crypto || !crypto.subtle){
+      return this._fallbackHash(password, salt);
     }
-    return salt + "$" + strong + "$" + fb;
+    try{
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw", enc.encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+      const bits = await crypto.subtle.deriveBits(
+        { name:"PBKDF2", salt:enc.encode(salt), iterations:100_000, hash:"SHA-256" },
+        key, 256);
+      return salt + "$" + this._buf2hex(bits);
+    }catch(e){
+      console.warn("crypto.subtle failed, using fallback:", e);
+      return this._fallbackHash(password, salt);
+    }
   },
   async verify(password, stored){
-    const s = String(stored || "");
-    if (!s) return false;
-    const p = s.split("$");
-    /* Legacy 2-part: salt$pbkdf2hex (old secure-only format) */
-    if (p.length === 2){
-      if (!(isSecureContext_() && crypto && crypto.subtle)) return false;
-      try{ return (await this._pbkdf2Hex(password, p[0])) === p[1]; }catch(e){ return false; }
-    }
-    /* Legacy 3-part fallback: salt$fb$hex  AND  current: salt$<strong|->$fb */
-    if (p.length === 3){
-      const salt = p[0], mid = p[1], fb = p[2];
-      if (mid === "fb") return this._fallbackHex(password, salt) === fb;
-      if (this._fallbackHex(password, salt) !== fb) return false;
-      if (mid && mid !== "-" && isSecureContext_() && crypto && crypto.subtle){
-        try{
-          const t = await this._pbkdf2Hex(password, salt);
-          if (t !== mid) return false;
-        }catch(e){ /* weak check already passed */ }
-      }
-      return true;
-    }
-    return false;
+    try{
+      const salt = String(stored).split("$")[0];
+      const test = await this.hash(password, salt);
+      return test === stored;
+    }catch(e){ return false; }
   },
 };
 
-/* ═══════════════════ CLOUD (Firestore) ═══════════════════ */
-const Cloud = {
+/* ═══════════════════ CLOUD DATABASE (Firebase) ═══════════════════
+   Shared backend for all devices. Anonymous auth + Firestore with
+   offline persistence and real-time listeners.                      */
+const CloudDB = {
   ready:false,
-  app:null, auth:null, db:null, fs:null, mod:null,
+  error:"",
+  app:null,
+  auth:null,
+  db:null,
+  uid:null,
+  _initPromise:null,
 
-  async init(){
-    if (this.ready) return;
-    const [appMod, authMod, fsMod] = await Promise.all([
-      import(SDK_BASE + "/firebase-app.js"),
-      import(SDK_BASE + "/firebase-auth.js"),
-      import(SDK_BASE + "/firebase-firestore.js"),
-    ]);
-    const app = appMod.initializeApp(FIREBASE_CONFIG);
+  sdkAvailable(){
+    return typeof firebase !== "undefined" && firebase && firebase.initializeApp;
+  },
 
-    let fsdb;
+  init(){
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._doInit();
+    return this._initPromise;
+  },
+
+  async _doInit(){
+    if (!this.sdkAvailable()){
+      this.error = "Firebase SDK not loaded (no internet on first load?)";
+      this.ready = false;
+      return false;
+    }
     try{
-      fsdb = fsMod.initializeFirestore(app, {
-        localCache: fsMod.persistentLocalCache({
-          tabManager: fsMod.persistentMultipleTabManager(),
-        }),
+      this.app = (firebase.apps && firebase.apps.length)
+        ? firebase.app()
+        : firebase.initializeApp(FIREBASE_CONFIG);
+
+      this.auth = firebase.auth();
+      this.db   = firebase.firestore();
+
+      try{
+        await this.db.enablePersistence({ synchronizeTabs:true });
+      }catch(e){
+        console.warn("Persistence not enabled:", e && e.code);
+      }
+
+      if (!this.auth.currentUser){
+        await this.auth.signInAnonymously();
+      }
+      this.uid = this.auth.currentUser ? this.auth.currentUser.uid : null;
+
+      this.auth.onAuthStateChanged(u => {
+        this.uid = u ? u.uid : null;
+        if (!u && this.ready){
+          // token dropped — try silently again
+          this.auth.signInAnonymously().catch(()=>{});
+        }
       });
+
+      this.ready = true;
+      this.error = "";
+      return true;
     }catch(e){
-      console.warn("[Cloud] persistent cache unavailable, using memory cache", e);
-      fsdb = fsMod.getFirestore(app);
-    }
-
-    const auth = authMod.getAuth(app);
-    try{ await authMod.setPersistence(auth, authMod.browserLocalPersistence); }catch(e){}
-
-    this.mod = { appMod, authMod, fsMod };
-    this.app = app; this.db = fsdb; this.auth = auth;
-    this.fs = {
-      collection: fsMod.collection,
-      doc:        fsMod.doc,
-      onSnapshot: fsMod.onSnapshot,
-      setDoc:     fsMod.setDoc,
-      deleteDoc:  fsMod.deleteDoc,
-      getDoc:     fsMod.getDoc,
-      getDocs:    fsMod.getDocs,
-      serverTimestamp: fsMod.serverTimestamp,
-    };
-    this.ready = true;
-  },
-
-  async signIn(){
-    const { authMod } = this.mod;
-    if (this.auth.currentUser) return this.auth.currentUser;
-    try{
-      const cred = await authMod.signInAnonymously(this.auth);
-      return cred.user;
-    }catch(e){
-      const code = (e && (e.code || e.message)) || "unknown";
-      throw new Error("Anonymous sign-in failed (" + code + "). Enable it in Firebase Console → Authentication → Sign-in method.");
+      this.error = (e && (e.code ? e.code + ": " : "") + (e.message || e)) || String(e);
+      this.ready = false;
+      console.warn("CloudDB init failed:", e);
+      return false;
     }
   },
 
-  _colName(key){ return CLOUD_COLLECTIONS[key] || key; },
+  col(key){ return this.db.collection(COLLECTIONS[key].name); },
 
-  async set(collKey, id, data){
-    if (!this.ready) return;
-    const { doc, setDoc } = this.fs;
-    const payload = cleanForCloud(data);
-    delete payload.id;                 // id lives in the doc path
-    await setDoc(doc(this.db, this._colName(collKey), String(id)), payload, { merge:true });
-  },
-
-  async remove(collKey, id){
-    if (!this.ready) return;
-    const { doc, deleteDoc } = this.fs;
-    await deleteDoc(doc(this.db, this._colName(collKey), String(id)));
-  },
-
-  async setSettings(settings){
-    if (!this.ready) return;
-    const { doc, setDoc } = this.fs;
-    const payload = cleanForCloud(settings);
-    delete payload.firebase_enabled;   // per-device preference, never shared
-    await setDoc(doc(this.db, SETTINGS_PATH[0], SETTINGS_PATH[1]), payload, { merge:true });
-  },
-
-  async setRaw(colName, id, data){
-    if (!this.ready) return;
-    const { doc, setDoc } = this.fs;
-    await setDoc(doc(this.db, colName, String(id)), cleanForCloud(data), { merge:true });
-  },
-
-  async getDocData(path){
-    const { doc, getDoc } = this.fs;
-    const snap = await getDoc(doc(this.db, path[0], path[1]));
-    return snap.exists() ? snap.data() : null;
+  async token(){
+    if (this.ready && this.auth && this.auth.currentUser){
+      try{ return await this.auth.currentUser.getIdToken(); }catch(e){}
+    }
+    return null;
   },
 };
 
-/* ═══════════════════ SYNC ENGINE ═══════════════════ */
-const Sync = {
-  mode: "local",        // "local" | "cloud"
-  state: "offline",     // "off" | "connecting" | "online" | "error"
-  error: "",
-  lastSync: null,
-  _unsubs: [],
-  _seen: {},
-  _firstSnap: null,
-  _firstSnapResolve: null,
+/* ═══════════════════ PERSISTENCE LAYER ═══════════════════
+   Every mutation writes to the local cache AND to the shared
+   cloud database (batched through a serial queue).                 */
+const Persist = {
+  _chain: Promise.resolve(),
 
-  isCloud(){ return this.mode === "cloud"; },
-
-  async boot(){
-    if (DB.settings.firebase_enabled !== "1"){
-      this.mode = "local"; this.state = "off";
-      App.refreshPills();
-      return;
-    }
-    this.state = "connecting";
-    App.refreshPills();
-    try{
-      await Cloud.init();
-      await Cloud.signIn();
-      this.mode = "cloud";
-      this.attach();
-      this.state = "online";
-      this.error = "";
-      App.refreshPills();
-      toast("☁  Connected — all devices share this data", "success", 2600);
-      this.afterFirstSnapshots();     // fire & forget
-    }catch(e){
-      console.error("[Sync] boot failed:", e);
-      this.mode = "local";
-      this.state = "error";
-      this.error = String((e && e.message) || e);
-      App.refreshPills();
-      toast("Cloud sync unavailable — this device runs standalone.\n" + this.error, "error", 8000);
-    }
+  _queue(fn){
+    this._chain = this._chain.then(fn).catch(e=>{
+      console.warn("Persist error:", e);
+      SyncStatus.set("error", String((e && e.message) || e));
+    });
+    return this._chain;
   },
 
-  attach(){
-    const { collection, doc, onSnapshot } = Cloud.fs;
-    const names = ["categories","products","customers","orders","expenses","users"];
-    const pending = new Set(names.concat(["settings"]));
+  cache(coll){ try{ STORE.set(coll, DB[coll]); }catch(e){} },
 
-    this._firstSnap = new Promise(res => { this._firstSnapResolve = res; });
-    const done = key => {
-      pending.delete(key);
-      if (!pending.size && this._firstSnapResolve){
-        const r = this._firstSnapResolve; this._firstSnapResolve = null; r();
+  _docId(coll, rec){
+    return COLLECTIONS[coll].single ? "main" : String(rec.id);
+  },
+
+  put(coll, rec){
+    this.cache(coll);
+    if (!rec || !CloudDB.ready) return;
+    const id = this._docId(coll, rec);
+    const data = sanitize(rec);
+    this._queue(()=> CloudDB.col(COLLECTIONS.settings.name && coll).doc(id).set(data));
+  },
+
+  putObject(coll, obj){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    const data = sanitize(obj || {});
+    this._queue(()=> CloudDB.col(coll).doc("main").set(data));
+  },
+
+  remove(coll, id){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    this._queue(()=> CloudDB.col(coll).doc(String(id)).delete());
+  },
+
+  putAll(coll){
+    this.cache(coll);
+    if (!CloudDB.ready) return;
+    if (COLLECTIONS[coll].single){ this.putObject(coll, DB[coll] || {}); return; }
+
+    const rows = Array.isArray(DB[coll]) ? DB[coll].slice() : [];
+    this._queue(async ()=>{
+      const colRef = CloudDB.col(coll);
+      let batch = CloudDB.db.batch();
+      let n = 0;
+      for (const rec of rows){
+        if (!rec || rec.id == null) continue;
+        batch.set(colRef.doc(String(rec.id)), sanitize(rec));
+        if (++n >= 400){ await batch.commit(); batch = CloudDB.db.batch(); n = 0; }
       }
-    };
+      if (n) await batch.commit();
+    });
+  },
 
-    for (const coll of names){
-      const un = onSnapshot(
-        collection(Cloud.db, CLOUD_COLLECTIONS[coll]),
-        snap => {
-          const arr = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
-          const changed = this._ingest(coll, arr);
-          this.lastSync = new Date();
-          this.state = "online";
-          if (changed) App.onData();
-          App.refreshPills();
-          done(coll);
-        },
+  /* Atomic stock change — safe when several devices sell at once. */
+  adjustStock(productId, delta){
+    this.cache("products");
+    if (!CloudDB.ready) return;
+    this._queue(()=> CloudDB.col("products")
+      .doc(String(productId))
+      .set({ stock: firebase.firestore.FieldValue.increment(delta) }, { merge:true }));
+  },
+};
+
+/* ═══════════════════ SYNC STATUS PILL ═══════════════════ */
+const SyncStatus = {
+  state:"local",
+  msg:"",
+  set(state, msg){
+    this.state = state;
+    if (msg !== undefined) this.msg = msg || "";
+    this.render();
+  },
+  render(){
+    const pill = document.getElementById("cloud-pill");
+    const txt  = document.getElementById("cloud-pill-txt");
+    if (!pill || !txt) return;
+    pill.classList.remove("ok","bad","warn");
+    if (this.state === "synced"){ pill.classList.add("ok");   txt.textContent = "Synced"; }
+    else if (this.state === "error"){ pill.classList.add("bad");  txt.textContent = "Sync err"; }
+    else if (this.state === "local"){ pill.classList.add("warn"); txt.textContent = "Local"; }
+    else { pill.classList.add("warn"); txt.textContent = "Syncing"; }
+    pill.title = this.msg || txt.textContent;
+  },
+};
+
+/* ═══════════════════ REAL-TIME LISTENERS ═══════════════════ */
+const Realtime = {
+  unsubs: [],
+  started: false,
+
+  start(){
+    if (!CloudDB.ready || this.started) return;
+    this.started = true;
+    for (const coll of COLLECTION_KEYS){
+      const unsub = CloudDB.col(coll).onSnapshot(
+        snap => this.apply(coll, snap),
         err => {
-          console.error("[Sync] " + coll + ":", err);
-          this.state = "error"; this.error = err.message || String(err);
-          App.refreshPills();
-          done(coll);
+          console.warn("snapshot error [" + coll + "]", err);
+          SyncStatus.set("error", (err && err.message) || String(err));
         }
       );
-      this._unsubs.push(un);
+      this.unsubs.push(unsub);
     }
-
-    const unSettings = onSnapshot(
-      doc(Cloud.db, SETTINGS_PATH[0], SETTINGS_PATH[1]),
-      snap => {
-        if (snap.exists()){
-          const localFlag = DB.settings.firebase_enabled;   // keep device preference
-          DB.settings = Object.assign({}, DB.settings, snap.data());
-          DB.settings.firebase_enabled = localFlag;
-          STORE.set("settings", DB.settings);
-          App.onData();
-        }
-        done("settings");
-      },
-      err => { console.error("[Sync] settings:", err); done("settings"); }
-    );
-    this._unsubs.push(unSettings);
-
-    /* live status when the browser goes on/offline */
-    window.addEventListener("online",  ()=>{ App.refreshPills(); toast("Back online — syncing…", "info", 2200); });
-    window.addEventListener("offline", ()=>{ App.refreshPills(); toast("Offline — changes will sync later", "warning", 3000); });
+    SyncStatus.set("synced", "Shared database connected");
   },
 
-  /* replace local mirror only when content actually changed */
-  _ingest(coll, arr){
-    const json = JSON.stringify(arr);
-    if (this._seen[coll] === json) return false;
-    this._seen[coll] = json;
-    DB[coll] = arr;
-    DB._persist(coll);
-    return true;
+  stop(){
+    for (const u of this.unsubs){ try{ u(); }catch(e){} }
+    this.unsubs = [];
+    this.started = false;
   },
 
-  async afterFirstSnapshots(){
-    const timeout = new Promise(r => setTimeout(r, 7000));
-    await Promise.race([this._firstSnap, timeout]);
-    try{ await this.seedDefaults(); }
-    catch(e){ console.warn("[Sync] seeding skipped:", e); }
-  },
+  apply(coll, snap){
+    const single = COLLECTIONS[coll].single;
+    let value;
 
-  /* Push defaults to an empty cloud database. Uses FIXED ids so that two
-     devices doing this simultaneously produce identical documents. */
-  async seedDefaults(){
-    const { doc, setDoc, getDoc } = Cloud.fs;
-    const backup = DB._backup || {};
-
-    /* 1. settings document */
-    try{
-      const sref = doc(Cloud.db, SETTINGS_PATH[0], SETTINGS_PATH[1]);
-      const snap = await getDoc(sref);
-      if (!snap.exists()){
-        const payload = cleanForCloud(DB.settings);
-        delete payload.firebase_enabled;
-        await setDoc(sref, payload, { merge:true });
-      }
-    }catch(e){ console.warn("[Sync] settings seed:", e); }
-
-    /* 2. categories + products */
-    if (!DB.categories.length && !DB.products.length){
-      const cats  = (Array.isArray(backup.categories) && backup.categories.length)
-                      ? backup.categories : seededCategories();
-      const prods = (Array.isArray(backup.products) && backup.products.length)
-                      ? backup.products   : seededProducts();
-      for (const c of cats){
-        await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.categories, String(c.id)),
-                     cleanForCloud(c), { merge:true });
-      }
-      for (const p of prods){
-        await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.products, String(p.id)),
-                     cleanForCloud(p), { merge:true });
-      }
-      toast("Cloud menu initialised (" + prods.length + " products)", "success");
+    if (single){
+      value = {};
+      snap.docs.forEach(d => { if (d.id === "main") value = d.data() || {}; });
+    } else {
+      value = snap.docs.map(d => {
+        const data = d.data() || {};
+        const n = Number(data.id);
+        return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
+      });
     }
 
-    /* 3. customers / expenses from a previous local install */
-    if (!DB.customers.length && Array.isArray(backup.customers) && backup.customers.length){
-      for (const c of backup.customers){
-        await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.customers, String(c.id)),
-                     cleanForCloud(c), { merge:true });
-      }
-    }
-    if (!DB.expenses.length && Array.isArray(backup.expenses) && backup.expenses.length){
-      for (const x of backup.expenses){
-        await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.expenses, String(x.id)),
-                     cleanForCloud(x), { merge:true });
-      }
-    }
+    const before = JSON.stringify(DB[coll] || (single ? {} : []));
+    const after  = JSON.stringify(value);
+    DB[coll] = value;
+    try{ STORE.set(coll, value); }catch(e){}
 
-    /* 4. orders from a previous local install */
-    if (!DB.orders.length && Array.isArray(backup.orders) && backup.orders.length){
-      for (const o of backup.orders.slice(-400)){
-        await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.orders, String(o.id)),
-                     cleanForCloud(o), { merge:true });
-      }
-    }
-
-    /* 5. default administrator */
-    if (!DB.users.length){
-      const hash = await Crypto.hash("admin123");
-      const u = {
-        username:"admin", password:hash, full_name:"Administrator",
-        role:"manager", active:1, created_at: nowIso(),
-      };
-      await setDoc(doc(Cloud.db, CLOUD_COLLECTIONS.users, "admin"),
-                   cleanForCloud(u), { merge:true });
-    }
-  },
-
-  /* Wait until the users collection has produced data (login needs it) */
-  async waitForUsers(ms=6000){
-    const t0 = Date.now();
-    while (!DB.users.length && Date.now() - t0 < ms){
-      await new Promise(r => setTimeout(r, 150));
-    }
-    return DB.users.length > 0;
+    if (before !== after) App.scheduleSyncRefresh();
   },
 };
 
-/* ═══════════════════ SEED BUILDERS ═══════════════════ */
-function seededCategories(){
-  return SEED_CATEGORIES.map((n,i)=>({
-    id: "seed_cat_" + (i+1), name:n, sort_order:i, created_at: nowIso(),
-  }));
-}
-function seededProducts(){
-  const cats = seededCategories();
-  const list = [];
-  SEED_PRODUCTS.forEach((row, idx)=>{
-    const [n,e,c,p,co,s,t,o] = row;
-    const cat = cats.find(x => x.name === c);
-    list.push({
-      id: "seed_prod_" + (idx+1),
-      name:n, emoji:e,
-      category_id: cat ? cat.id : null,
-      price:p, cost:co, stock:s, track_stock:t,
-      low_stock: 5,
-      has_options:o, active:1,
-      sort_order: idx,
-      size_prices:"",
-      custom_options: CUSTOM_OPTIONS[n] ? JSON.stringify(CUSTOM_OPTIONS[n]) : "",
-      created_at: nowIso(),
-    });
-  });
-  return list;
-}
-
-/* ═══════════════════ DB ═══════════════════ */
+/* ═══════════════════ DB (shared, cloud-backed) ═══════════════════ */
 const DB = {
   settings:{}, users:[], categories:[], products:[], customers:[],
-  orders:[], expenses:[],
-  _backup:{},
+  orders:[], order_items:[], expenses:[], stock_moves:[],
 
-  /* ---------- local persistence ---------- */
-  _persist(coll){
-    try{ STORE.set(coll, this[coll]); }catch(e){}
+  /* ---------- boot ---------- */
+  _hydrateLocal(){
+    this.settings    = STORE.get("settings",    {}) || {};
+    this.users       = STORE.get("users",       []) || [];
+    this.categories  = STORE.get("categories",  []) || [];
+    this.products    = STORE.get("products",    []) || [];
+    this.customers   = STORE.get("customers",   []) || [];
+    this.orders      = STORE.get("orders",      []) || [];
+    this.order_items = STORE.get("order_items", []) || [];
+    this.expenses    = STORE.get("expenses",    []) || [];
+    this.stock_moves = STORE.get("stock_moves", []) || [];
   },
 
-  byId(coll, id){
-    return (this[coll] || []).find(x => String(x.id) === String(id));
+  async load(onStatus){
+    const status = onStatus || function(){};
+
+    status("Loading local cache…");
+    this._hydrateLocal();
+
+    status("Connecting to shared database…");
+    const cloudOk = await CloudDB.init();
+
+    /* Cloud sync can be explicitly disabled — then we run local-only. */
+    const cloudWanted = (this.settings.firebase_enabled !== "0");
+    const useCloud = cloudOk && cloudWanted;
+
+    let firstTime = true;
+    let cloudReachable = false;
+
+    if (useCloud){
+      status("Downloading shared data…");
+      try{
+        const res = await withTimeout(this._fetchCloud(), 15000);
+        firstTime = res.usersEmpty;
+        cloudReachable = true;
+      }catch(e){
+        console.warn("Initial cloud fetch failed:", e);
+        CloudDB.error = (e && e.message) || String(e);
+        firstTime = false;                 // don't push, avoid clobbering
+        SyncStatus.set("error", CloudDB.error);
+      }
+    } else {
+      firstTime = !this.users.length;
+      if (cloudOk && !cloudWanted) SyncStatus.set("local", "Cloud sync disabled in Settings");
+      else if (!cloudOk) SyncStatus.set("local", CloudDB.error || "Offline — local data only");
+    }
+
+    if (firstTime){
+      if (!this.users.length){ status("Seeding default data…"); await this._seed(); }
+      this._migrations();
+      this.saveAll();
+      if (useCloud && cloudReachable){
+        status("Uploading to shared database…");
+        this.pushAllToCloud();
+      }
+    } else {
+      this._migrations();
+      this.saveAll();
+    }
+
+    if (useCloud && cloudReachable){
+      Realtime.start();
+      SyncStatus.set("synced", "Shared database connected · device " + (CloudDB.uid || "").slice(0,6));
+    }
+    status("");
   },
 
-  /* ---------- load from local cache ---------- */
-  async load(){
-    this.settings  = Object.assign({}, DEFAULT_SETTINGS, STORE.get("settings", {}) || {});
-    this.users     = STORE.get("users", [])      || [];
-    this.categories= STORE.get("categories", []) || [];
-    this.products  = STORE.get("products", [])   || [];
-    this.customers = STORE.get("customers", [])  || [];
-    this.orders    = STORE.get("orders", [])     || [];
-    this.expenses  = STORE.get("expenses", [])   || [];
+  /* Pull every shared collection once (used during boot). */
+  async _fetchCloud(){
+    const snaps = await Promise.all(
+      COLLECTION_KEYS.map(k => CloudDB.col(k).get())
+    );
+    const map = {};
+    COLLECTION_KEYS.forEach((k, i) => { map[k] = snaps[i]; });
 
-    this._migrateLocal();
+    const usersEmpty = map.users.empty;
 
-    /* keep a copy of everything we had locally, so an empty cloud DB
-       can be seeded from this device's existing data */
-    this._backup = {
-      categories: cloneJson(this.categories),
-      products:   cloneJson(this.products),
-      customers:  cloneJson(this.customers),
-      orders:     cloneJson(this.orders),
-      expenses:   cloneJson(this.expenses),
-      users:      cloneJson(this.users),
-    };
+    if (!usersEmpty){
+      const arr = snap => snap.docs.map(d => {
+        const data = d.data() || {};
+        const n = Number(data.id);
+        return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
+      });
+      this.users       = arr(map.users);
+      this.categories  = arr(map.categories);
+      this.products    = arr(map.products);
+      this.customers   = arr(map.customers);
+      this.orders      = arr(map.orders);
+      this.order_items = arr(map.order_items);
+      this.expenses    = arr(map.expenses);
+      this.stock_moves = arr(map.stock_moves);
 
-    /* make sure at least one account exists so login works offline */
+      let s = {};
+      map.settings.docs.forEach(d => { if (d.id === "main") s = d.data() || {}; });
+      this.settings = s;
+    }
+    return { usersEmpty };
+  },
+
+  pushAllToCloud(){
+    for (const coll of COLLECTION_KEYS){
+      if (COLLECTIONS[coll].single) Persist.putObject(coll, this[coll] || {});
+      else Persist.putAll(coll);
+    }
+  },
+
+  saveAll(){
+    for (const coll of COLLECTION_KEYS){
+      try{ STORE.set(coll, this[coll]); }catch(e){}
+    }
+  },
+  save(key){ try{ STORE.set(key, this[key]); }catch(e){} },
+
+  async _seed(){
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, this.settings);
+    this.settings.options_v2 = "1";
+    this.settings.bbq_v1 = "1";
+    this.settings.extras_v1 = "1";
+    this.settings.extras_v2 = "1";
+    try{
+      const opts = JSON.parse(this.settings.product_options);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+    }catch(e){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+    }
+
     if (!this.users.length){
+      const hash = await Crypto.hash("admin123");
       this.users = [{
-        id:"admin", username:"admin",
-        password: await Crypto.hash("admin123"),
+        id:newId(), username:"admin", password:hash,
         full_name:"Administrator", role:"manager", active:1,
         created_at: nowIso(),
       }];
-      this._persist("users");
     }
 
-    /* keep settings sane */
-    this._normaliseSettings();
+    if (!this.categories.length){
+      this.categories = SEED_CATEGORIES.map((n,i)=>({ id:newId(), name:n, sort_order:i }));
+    }
+
+    if (!this.products.length){
+      this.products = [];
+      for (const [n,e,c,p,co,s,t,o] of SEED_PRODUCTS){
+        const cat = this.categories.find(x=>x.name === c);
+        const custom = CUSTOM_OPTIONS[n] ? JSON.stringify(CUSTOM_OPTIONS[n]) : "";
+        this.products.push({
+          id:newId(),
+          name:n, emoji:e, category_id:cat ? cat.id : null,
+          price:p, cost:co, stock:s, track_stock:t,
+          low_stock: Number(this.settings.low_stock_default)||5,
+          has_options:o, active:1,
+          size_prices:"", custom_options:custom,
+        });
+      }
+    }
   },
 
-  _normaliseSettings(){
+  _migrations(){
+    let changed = false;
+
+    if (this.settings.options_v2 !== "1"){
+      this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+      this.settings.options_v2 = "1";
+      changed = true;
+    }
+    if (this.settings.extras_v1 !== "1"){
+      let opts = null;
+      try{ opts = JSON.parse(this.settings.product_options); }catch(e){ opts = null; }
+      if (!Array.isArray(opts) || !opts.length) opts = cloneJson(DEFAULT_OPTIONS);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+      this.settings.extras_v1 = "1";
+      changed = true;
+    }
+    if (this.settings.extras_v2 !== "1"){
+      let opts = null;
+      try{ opts = JSON.parse(this.settings.product_options); }catch(e){ opts = null; }
+      if (!Array.isArray(opts) || !opts.length) opts = cloneJson(DEFAULT_OPTIONS);
+      this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
+      this.settings.extras_v2 = "1";
+      changed = true;
+    }
+    if (this.settings.bbq_v1 !== "1"){
+      const bbq = this.products.find(x=>x.name === "Chicken BBQ Pizza");
+      if (bbq){ bbq.price = 1200000; bbq.has_options = 0; bbq.custom_options = ""; bbq.size_prices = ""; }
+      this.settings.bbq_v1 = "1";
+      changed = true;
+    }
     for (const k in DEFAULT_SETTINGS){
-      if (!(k in this.settings)) this.settings[k] = DEFAULT_SETTINGS[k];
+      if (!(k in this.settings)){ this.settings[k] = DEFAULT_SETTINGS[k]; changed = true; }
     }
     try{
       const opts = JSON.parse(this.settings.product_options);
       const res = ensureExtrasGroup(opts);
-      this.settings.product_options = JSON.stringify(res.groups);
+      if (res.changed){
+        this.settings.product_options = JSON.stringify(res.groups);
+        changed = true;
+      }
     }catch(e){
       this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
+      changed = true;
     }
-    STORE.set("settings", this.settings);
-  },
-
-  /* Old single-device installs stored order lines in a separate array */
-  _migrateLocal(){
-    const oi = STORE.get("order_items", []);
-    if (Array.isArray(oi) && oi.length){
-      for (const o of this.orders){
-        if (!Array.isArray(o.items)){
-          o.items = oi
-            .filter(i => String(i.order_id) === String(o.id))
-            .map(i => ({
-              product_id: i.product_id, name: i.name,
-              qty: i.qty, unit: i.unit_price, line: i.line_total,
-              options: i.options || "", note: i.note || "",
-            }));
-        }
-      }
-      this._persist("orders");
+    for (const p of this.products){
+      const c = CUSTOM_OPTIONS[p.name];
+      if (c && !p.custom_options){ p.custom_options = JSON.stringify(c); p.has_options = 1; p.price = 0; changed = true; }
     }
-  },
-
-  /* ---------- writes (local mirror + cloud) ---------- */
-  async put(coll, obj){
-    const rec = Object.assign({}, obj);
-    if (!rec.id) rec.id = uid(coll.slice(0,3));
-    rec.updated_at = nowIso();
-
-    const arr = this[coll];
-    const i = arr.findIndex(x => String(x.id) === String(rec.id));
-    if (i >= 0) arr[i] = Object.assign({}, arr[i], rec);
-    else arr.push(rec);
-    this._persist(coll);
-
-    try{ await Cloud.set(coll, rec.id, rec); }
-    catch(e){ console.error("Cloud write failed", coll, e); }
-
-    App.onData();
-    return rec.id;
-  },
-
-  async remove(coll, id){
-    this[coll] = this[coll].filter(x => String(x.id) !== String(id));
-    this._persist(coll);
-    try{ await Cloud.remove(coll, id); }
-    catch(e){ console.error("Cloud delete failed", coll, e); }
-    App.onData();
-  },
-
-  async saveSettings(patch){
-    Object.assign(this.settings, patch);
-    STORE.set("settings", this.settings);
-    try{ await Cloud.setSettings(this.settings); }
-    catch(e){ console.error("Cloud settings write failed", e); }
-    App.onData();
+    if (changed){
+      try{ STORE.set("settings", this.settings); STORE.set("products", this.products); }catch(e){}
+    }
+    return changed;
   },
 
   /* ---------- categories ---------- */
   categoriesSorted(){
     return [...this.categories].sort((a,b)=>
-      ((a.sort_order|0) - (b.sort_order|0)) || String(a.name).localeCompare(String(b.name)));
+      (a.sort_order - b.sort_order) || String(a.name).localeCompare(String(b.name)));
+  },
+  saveCategory(data, id){
+    if (id){
+      const c = this.categories.find(x=>x.id === id);
+      if (c){ Object.assign(c, data); Persist.put("categories", c); }
+      return id;
+    }
+    const c = Object.assign({ id:newId(), sort_order:99 }, data);
+    this.categories.push(c);
+    Persist.put("categories", c);
+    return c.id;
   },
 
   /* ---------- products ---------- */
   productsList({search="", category_id=null, only_active=true}={}){
     const s = (search||"").toLowerCase();
-    return this.products
-      .filter(p=>{
-        if (only_active && !p.active) return false;
-        if (category_id && String(p.category_id) !== String(category_id)) return false;
-        if (s){
-          const c = this.byId("categories", p.category_id);
-          const inName = String(p.name||"").toLowerCase().includes(s);
-          const inCat  = c ? String(c.name).toLowerCase().includes(s) : false;
-          if (!inName && !inCat) return false;
-        }
-        return true;
-      })
-      .sort((a,b)=>
-        ((a.sort_order ?? 9999) - (b.sort_order ?? 9999)) ||
-        String(a.name).localeCompare(String(b.name)));
+    return this.products.filter(p=>{
+      if (only_active && !p.active) return false;
+      if (category_id && p.category_id !== category_id) return false;
+      if (s){
+        const c = this.categories.find(x=>x.id === p.category_id);
+        const inName = String(p.name||"").toLowerCase().includes(s);
+        const inCat  = c ? String(c.name||"").toLowerCase().includes(s) : false;
+        if (!inName && !inCat) return false;
+      }
+      return true;
+    });
   },
-  getProduct(id){ return this.byId("products", id); },
-  async saveProduct(data, id){
+  getProduct(id){ return this.products.find(p=>p.id === id); },
+  saveProduct(data, id){
     if (id){
       const p = this.getProduct(id);
-      if (p) await this.put("products", Object.assign({}, p, data));
+      if (p){ Object.assign(p, data); Persist.put("products", p); }
       return id;
     }
-    const nextSort = this.products.reduce((m,p)=>Math.max(m, (p.sort_order|0)+1), 0);
-    const rec = Object.assign({
-      active:1, size_prices:"", custom_options:"",
-      created_at: nowIso(), sort_order: nextSort,
-    }, data);
-    return await this.put("products", rec);
+    const p = Object.assign(
+      { id:newId(), active:1, size_prices:"", custom_options:"" }, data);
+    this.products.push(p);
+    Persist.put("products", p);
+    return p.id;
   },
-  deleteProduct(id){ return this.remove("products", id); },
+  deleteProduct(id){
+    this.products = this.products.filter(p=>p.id !== id);
+    Persist.remove("products", id);
+  },
 
   /* ---------- customers ---------- */
   customersList(search=""){
     const s = (search||"").toLowerCase();
     return [...this.customers]
-      .filter(c => !s ||
-        String(c.name||"").toLowerCase().includes(s) ||
-        String(c.phone||"").toLowerCase().includes(s))
-      .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+      .filter(c => !s || String(c.name||"").toLowerCase().includes(s) || String(c.phone||"").toLowerCase().includes(s))
+      .sort((a,b)=> String(a.name||"").localeCompare(String(b.name||"")));
   },
-  async saveCustomer(data, id){
+  saveCustomer(data, id){
     if (id){
-      const c = this.byId("customers", id);
-      if (c) await this.put("customers", Object.assign({}, c, data));
+      const c = this.customers.find(x=>x.id === id);
+      if (c){ Object.assign(c, data); Persist.put("customers", c); }
       return id;
     }
-    return await this.put("customers", Object.assign(
-      { points:0, created_at: nowIso() }, data));
+    const c = Object.assign({ id:newId(), points:0, created_at: nowIso() }, data);
+    this.customers.push(c);
+    Persist.put("customers", c);
+    return c.id;
   },
-  deleteCustomer(id){ return this.remove("customers", id); },
+  deleteCustomer(id){
+    this.customers = this.customers.filter(c=>c.id !== id);
+    Persist.remove("customers", id);
+  },
 
   /* ---------- orders ---------- */
-  async nextOrderNo(){
+  nextOrderNo(){
     const d = new Date();
     const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
-    const prefix = `ORD-${day}-`;
-
-    if (Sync.isCloud()){
-      try{
-        const { doc, runTransaction } = Cloud.mod.fsMod;
-        const ref = doc(Cloud.db, COUNTERS_PATH[0], COUNTERS_PATH[1]);
-        const key = "d" + day;
-        const n = await runTransaction(Cloud.db, async tx => {
-          const snap = await tx.get(ref);
-          const cur = (snap.exists() && Number(snap.data()[key])) || 0;
-          const next = cur + 1;
-          tx.set(ref, { [key]: next }, { merge:true });
-          return next;
-        });
-        return prefix + String(n).padStart(4,"0");
-      }catch(e){
-        /* offline / transaction unavailable → unique time-based fallback */
-        const t = `${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}${String(d.getSeconds()).padStart(2,"0")}`;
-        return prefix + t;
-      }
-    }
-
+    const pref = `ORD-${day}-`;
     let n = 0;
-    for (const o of this.orders){
-      if (o.order_no && String(o.order_no).startsWith(prefix)) n++;
-    }
-    return prefix + String(n+1).padStart(4,"0");
+    for (const o of this.orders){ if (o.order_no && o.order_no.startsWith(pref)) n++; }
+    return pref + String(n+1).padStart(4,"0");
   },
-
+  _freeOrderNo(no){
+    if (!this.orders.some(o => o.order_no === no)) return no;
+    const m = /^(.*-)(\d+)$/.exec(no);
+    if (!m) return no + "-" + String(Math.floor(Math.random()*90+10));
+    const base = m[1];
+    let num = parseInt(m[2], 10);
+    let candidate = no;
+    let guard = 0;
+    do {
+      num++;
+      candidate = base + String(num).padStart(4,"0");
+      guard++;
+    } while (this.orders.some(o => o.order_no === candidate) && guard < 9999);
+    return candidate;
+  },
   openOrders(){
     return this.orders
       .filter(o => o.status === "open")
-      .sort((a,b)=>String(a.created_at||"").localeCompare(String(b.created_at||"")));
+      .map(o => Object.assign({}, o, {
+        items: this.order_items.filter(i => i.order_id === o.id),
+      }));
   },
-
-  _orderItemsForCloud(items){
-    return (items||[]).map(i => ({
-      product_id: i.product_id != null ? String(i.product_id) : "",
-      name: i.name || "",
-      qty: Number(i.qty) || 1,
-      unit: Number(i.unit) || 0,
-      line: Number(i.line) || 0,
-      options: Array.isArray(i.options)
-        ? i.options.map(x => (x && x.label != null) ? x.label : String(x)).join(", ")
-        : String(i.options || ""),
-      note: i.note || "",
-    }));
-  },
-
-  async saveOrder(o, status="open"){
+  saveOrder(o, status="open"){
     const now = nowIso();
-    let rec;
+    let oid = o.id;
+    let row;
 
-    if (o.id){
-      const row = this.byId("orders", o.id);
-      rec = Object.assign({}, row, {
-        order_type: o.type,
-        status,
-        customer_id: o.customer_id || null,
-        customer_name: o.customer_name || "",
-        customer_phone: o.customer_phone || "",
-        subtotal: o.subtotal, discount: o.discount, tax: o.tax,
-        delivery: o.delivery, total: o.total,
-        payment_method: o.payment_method || "Cash",
-        user_id: o.user_id || null,
-        note: o.note || "",
-        items: this._orderItemsForCloud(o.items),
-        updated_at: now,
-      });
-      if (status === "paid" && !rec.closed_at) rec.closed_at = now;
+    if (oid){
+      row = this.orders.find(x=>x.id === oid);
+      if (row){
+        Object.assign(row, {
+          order_type:o.type, status,
+          customer_id:o.customer_id, customer_name:o.customer_name||"",
+          customer_phone:o.customer_phone||"",
+          subtotal:o.subtotal, discount:o.discount, tax:o.tax,
+          delivery:o.delivery, total:o.total,
+          payment_method:o.payment_method||"Cash",
+          user_id:o.user_id, note:o.note||"",
+        });
+      }
+      /* wipe this order's old lines, then re-add */
+      const old = this.order_items.filter(i=>i.order_id === oid);
+      this.order_items = this.order_items.filter(i=>i.order_id !== oid);
+      for (const it of old) Persist.remove("order_items", it.id);
+      if (row) Persist.put("orders", row);
     } else {
-      rec = {
-        id: uid("ord"),
-        order_no: o.no,
-        order_type: o.type || "Delivery",
-        status,
-        customer_id: o.customer_id || null,
-        customer_name: o.customer_name || "",
-        customer_phone: o.customer_phone || "",
-        subtotal: o.subtotal, discount: o.discount, tax: o.tax,
-        delivery: o.delivery, total: o.total,
-        payment_method: o.payment_method || "Cash",
-        user_id: o.user_id || null,
-        note: o.note || "",
-        items: this._orderItemsForCloud(o.items),
-        created_at: now,
-        closed_at: status === "paid" ? now : null,
+      oid = newId();
+      const no = this._freeOrderNo(o.no);
+      o.no = no;
+      row = {
+        id:oid, order_no:no, order_type:o.type||"Delivery", status,
+        customer_id:o.customer_id||null, customer_name:o.customer_name||"",
+        customer_phone:o.customer_phone||"",
+        subtotal:o.subtotal, discount:o.discount, tax:o.tax,
+        delivery:o.delivery, total:o.total,
+        payment_method:o.payment_method||"Cash",
+        user_id:o.user_id||null, note:o.note||"",
+        created_at:now, closed_at:null,
       };
-      o.id = rec.id;
+      this.orders.push(row);
+      o.id = oid;
+      Persist.put("orders", row);
     }
-    await this.put("orders", rec);
-    return rec.id;
-  },
 
-  async deductStock(o){
-    for (const it of (o.items || [])){
+    for (const it of o.items){
+      const item = {
+        id:newId(),
+        order_id: oid, product_id: it.product_id, name: it.name,
+        qty: it.qty, unit_price: it.unit,
+        options: (it.options||[]).map(x=>x.label).join(", "),
+        note: it.note||"",
+        line_total: it.line,
+      };
+      this.order_items.push(item);
+      Persist.put("order_items", item);
+    }
+
+    if (status === "paid"){
+      const r = this.orders.find(x=>x.id === oid);
+      if (r){ r.closed_at = now; Persist.put("orders", r); }
+    }
+    return oid;
+  },
+  deductStock(o){
+    for (const it of o.items){
       const p = this.getProduct(it.product_id);
       if (p && p.track_stock){
-        await this.put("products", Object.assign({}, p, {
-          stock: Number(p.stock||0) - Number(it.qty||0),
-        }));
+        p.stock = Number(p.stock||0) - Number(it.qty||0);
+        const mv = {
+          id:newId(), product_id:p.id,
+          change:-it.qty, reason:"Order " + o.no, created_at: nowIso(),
+        };
+        this.stock_moves.push(mv);
+        Persist.put("stock_moves", mv);
+        Persist.adjustStock(p.id, -Number(it.qty||0));
       }
     }
   },
@@ -1341,25 +1321,30 @@ const DB = {
   /* ---------- expenses ---------- */
   expensesList(){
     return [...this.expenses].sort((a,b)=>
-      String(b.spent_on||"").localeCompare(String(a.spent_on||"")) ||
-      String(b.id).localeCompare(String(a.id)));
+      String(b.spent_on||"").localeCompare(String(a.spent_on||"")) || (b.id - a.id));
   },
-  async saveExpense(data, id){
+  saveExpense(data, id){
     if (id){
-      const e = this.byId("expenses", id);
-      if (e) await this.put("expenses", Object.assign({}, e, data));
+      const e = this.expenses.find(x=>x.id === id);
+      if (e){ Object.assign(e, data); Persist.put("expenses", e); }
       return id;
     }
-    return await this.put("expenses", Object.assign({ created_at: nowIso() }, data));
+    const e = Object.assign({ id:newId(), created_at: nowIso() }, data);
+    this.expenses.push(e);
+    Persist.put("expenses", e);
+    return e.id;
   },
-  deleteExpense(id){ return this.remove("expenses", id); },
+  deleteExpense(id){
+    this.expenses = this.expenses.filter(e=>e.id !== id);
+    Persist.remove("expenses", id);
+  },
 
-  /* ---------- reporting ---------- */
+  /* ---------- reports ---------- */
   _paidOrdersInRange(s, e){
     return this.orders.filter(o =>
       o.status === "paid" &&
-      String(o.created_at||"").slice(0,10) >= s &&
-      String(o.created_at||"").slice(0,10) <= e);
+      (o.created_at||"").slice(0,10) >= s &&
+      (o.created_at||"").slice(0,10) <= e);
   },
   summary(s, e){
     const os = this._paidOrdersInRange(s, e);
@@ -1375,28 +1360,28 @@ const DB = {
   },
   topProducts(s, e){
     const os = this._paidOrdersInRange(s, e);
+    const ids = new Set(os.map(o=>o.id));
     const map = new Map();
-    for (const o of os){
-      for (const it of (o.items||[])){
-        const k = it.name || "?";
-        if (!map.has(k)) map.set(k, { name:k, qty:0, revenue:0 });
-        const r = map.get(k);
-        r.qty += Number(it.qty||0);
-        r.revenue += Number(it.line||0);
-      }
+    for (const it of this.order_items){
+      if (!ids.has(it.order_id)) continue;
+      const k = it.name;
+      if (!map.has(k)) map.set(k, { name:k, qty:0, revenue:0 });
+      const r = map.get(k);
+      r.qty += Number(it.qty||0);
+      r.revenue += Number(it.line_total||0);
     }
     return [...map.values()].sort((a,b)=>b.revenue - a.revenue).slice(0,10);
   },
   salesByCategory(s, e){
     const os = this._paidOrdersInRange(s, e);
+    const ids = new Set(os.map(o=>o.id));
     const map = new Map();
-    for (const o of os){
-      for (const it of (o.items||[])){
-        const p = this.getProduct(it.product_id);
-        const c = p ? this.byId("categories", p.category_id) : null;
-        const k = c ? c.name : "Other";
-        map.set(k, (map.get(k)||0) + Number(it.line||0));
-      }
+    for (const it of this.order_items){
+      if (!ids.has(it.order_id)) continue;
+      const p = this.getProduct(it.product_id);
+      const c = p ? this.categories.find(x=>x.id === p.category_id) : null;
+      const k = c ? c.name : "Other";
+      map.set(k, (map.get(k)||0) + Number(it.line_total||0));
     }
     return [...map.entries()].map(([category, revenue])=>({category, revenue}))
       .sort((a,b)=>b.revenue - a.revenue);
@@ -1416,7 +1401,7 @@ const DB = {
     const os = this._paidOrdersInRange(s, e);
     const map = new Map();
     for (const o of os){
-      const d = String(o.created_at||"").slice(0,10);
+      const d = (o.created_at||"").slice(0,10);
       if (!map.has(d)) map.set(d, { day:d, orders:0, revenue:0 });
       const r = map.get(d);
       r.orders++; r.revenue += Number(o.total||0);
@@ -1424,7 +1409,7 @@ const DB = {
     return [...map.values()].sort((a,b)=>b.day.localeCompare(a.day));
   },
   cashSummary(s, e){
-    const os = this._paidOrdersInRange(s, e).filter(o => (o.payment_method||"Cash") === "Cash");
+    const os = this._paidOrdersInRange(s, e).filter(o=>o.payment_method === "Cash");
     const exp = this.expenses.filter(x =>
       (x.spent_on||"") >= s && (x.spent_on||"") <= e);
     const cash_sales = os.reduce((a,o)=>a + Number(o.total||0), 0);
@@ -1434,24 +1419,27 @@ const DB = {
 
   /* ---------- users ---------- */
   async authenticate(u, p){
-    const user = this.users.find(x =>
-      String(x.username).toLowerCase() === String(u).toLowerCase() && x.active !== 0);
+    const user = this.users.find(x=>x.username === u && x.active);
     if (!user) return null;
     const ok = await Crypto.verify(p, user.password);
     return ok ? user : null;
   },
   async addUser(u, p, n, r){
-    if (this.users.some(x => String(x.username).toLowerCase() === String(u).toLowerCase()))
-      throw new Error("exists");
+    if (this.users.some(x=>x.username === u)) throw new Error("exists");
     const hash = await Crypto.hash(p);
-    await this.put("users", {
-      username: u, password: hash, full_name: n, role: r,
-      active: 1, created_at: nowIso(),
-    });
+    const rec = {
+      id:newId(), username:u, password:hash,
+      full_name:n, role:r, active:1, created_at: nowIso(),
+    };
+    this.users.push(rec);
+    Persist.put("users", rec);
   },
-  async deleteUser(id){
-    const u = this.byId("users", id);
-    if (u && u.username !== "admin") await this.remove("users", id);
+  deleteUser(id){
+    const u = this.users.find(x=>x.id === id);
+    if (u && u.username !== "admin"){
+      this.users = this.users.filter(x=>x.id !== id);
+      Persist.remove("users", id);
+    }
   },
 };
 
@@ -1475,8 +1463,8 @@ function ensureExtrasGroup(groups){
 function computeUnitPrice(product, chosenOptions){
   let total = Number(product.price) || 0;
   for (const o of chosenOptions) total += Number(o.price) || 0;
-  const labels = new Set(chosenOptions.map(o => String(o.label||"").toLowerCase()));
-  const name = String(product.name||"").toLowerCase();
+  const labels = new Set(chosenOptions.map(o=>(o.label||"").toLowerCase()));
+  const name = (product.name||"").toLowerCase();
   const isLarge = labels.has("large");
   const hasBBQ  = [...labels].some(l => l.includes("bbq") || l.includes("barbecue"));
   const productIsBBQ = name.includes("bbq") || name.includes("barbecue");
@@ -1495,9 +1483,11 @@ function optionsFor(product){
   if (!Array.isArray(groups) || !groups.length) groups = cloneJson(DEFAULT_OPTIONS);
   const res = ensureExtrasGroup(groups);
   if (res.changed){
-    DB.settings.product_options = JSON.stringify(res.groups);
-    STORE.set("settings", DB.settings);
-    Cloud.setSettings(DB.settings).catch(()=>{});
+    try{
+      DB.settings.product_options = JSON.stringify(res.groups);
+      DB.save("settings");
+      Persist.putObject("settings", DB.settings);
+    }catch(e){}
   }
   return res.groups;
 }
@@ -1514,7 +1504,8 @@ class EscPos {
     for (const ch of String(s)){
       const code = ch.charCodeAt(0);
       if (code === 0x09){ this.buf.push(0x09); continue; }
-      if (code < 0x100) this.buf.push(code);
+      if (code < 0x80) this.buf.push(code);
+      else if (code < 0x100) this.buf.push(code);
       else this.buf.push(0x3F);
     }
     return this;
@@ -1554,8 +1545,11 @@ const USBPrinter = {
         { classCode:7 }, { classCode:0xFF }, {}
       ]});
     }
-    try{ await dev.open(); }
-    catch(e){ if (!String(e.message||"").match(/already open/i)) throw e; }
+    try{
+      await dev.open();
+    }catch(e){
+      if (!String(e.message||"").match(/already open/i)) throw e;
+    }
     if (dev.configuration === null) await dev.selectConfiguration(1);
 
     let epNum = null, ifaceNum = 0;
@@ -1579,6 +1573,7 @@ const USBPrinter = {
     this.device = dev;
     this.endpoint = epNum;
     this.ifaceNum = ifaceNum;
+    STORE.set("usb_printer", { vid: dev.vendorId, pid: dev.productId });
     return { vid: dev.vendorId, pid: dev.productId };
   },
 
@@ -1596,7 +1591,9 @@ const USBPrinter = {
       for (let i = 0; i < bytes.length; i += CHUNK){
         const slice = bytes.slice(i, Math.min(i + CHUNK, bytes.length));
         const res = await this.device.transferOut(this.endpoint, slice);
-        if (res && res.status && res.status !== "ok") throw new Error("USB transfer " + res.status);
+        if (res && res.status && res.status !== "ok"){
+          throw new Error("USB transfer " + res.status);
+        }
       }
     } finally {
       this._busy = false;
@@ -1637,9 +1634,9 @@ function buildReceiptText(order, settings, copyLabel=""){
   if (order.customer_phone) lines.push("Phone: " + order.customer_phone);
   lines.push("Type: " + (order.type || "Delivery"));
   lines.push(sep("-"));
-  for (const it of (order.items||[])){
+  for (const it of order.items){
     lines.push(it.name);
-    const opts = optLabels(it).join(", ");
+    const opts = (it.options||[]).map(o=>o.label).join(", ");
     if (opts) lines.push("  " + opts);
     if (it.note) lines.push("  Note: " + it.note);
     lines.push(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym), fmtMoney(it.line, sym)));
@@ -1689,9 +1686,9 @@ function buildEscPosReceipt(order, settings, copyLabel){
   if (order.customer_phone) p.line("Phone: " + order.customer_phone);
   p.line("Type: " + (order.type || "Delivery"));
   p.line(sep("-"));
-  for (const it of (order.items||[])){
+  for (const it of order.items){
     p.line(it.name);
-    const opts = optLabels(it).join(", ");
+    const opts = (it.options||[]).map(o=>o.label).join(", ");
     if (opts) p.line("  " + opts);
     if (it.note) p.line("  Note: " + it.note);
     p.line(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym), fmtMoney(it.line, sym)));
@@ -1751,28 +1748,7 @@ function buildCloseCashText(start, end, settings){
   return lines.join("\n");
 }
 
-/* ═══════════════════ PRINT QUEUE (cloud) ═══════════════════ */
-const PrintQueue = {
-  async push(job){
-    if (!Sync.isCloud()) throw new Error("Cloud sync is switched off on this device");
-    const col = (DB.settings.firebase_collection_print_jobs || "print_jobs").trim() || "print_jobs";
-    const id = uid("job");
-    await Cloud.setRaw(col, id, {
-      printer_name: job.printer_name || "",
-      order_no: job.order_no || "",
-      cut: job.cut || "partial",
-      drawer: job.drawer === true,
-      copies: job.copies || 1,
-      data: job.data || [],
-      status: "pending",
-      source: "pizza_pos_web",
-      created_at: nowIso(),
-    });
-    return id;
-  },
-};
-
-/* ═══════════════════ UNIFIED PRINTER ═══════════════════ */
+/* ═══════════════════ UNIFIED PRINTER (unchanged behaviour) ═══════════════════ */
 const Printer = {
   copies(settings){
     const n = Number(settings.printer_copies || 2);
@@ -1824,7 +1800,7 @@ const Printer = {
       return { ok:false, error:"no agent url" };
     }
     if (!isSecureContext_()){
-      toast("Agent printing over HTTP requires an HTTPS page (or localhost).", "error", 7000);
+      toast("Agent printing over HTTP requires HTTPS page (or localhost).", "error", 7000);
       return { ok:false, error:"not secure context" };
     }
     try{
@@ -1853,14 +1829,14 @@ const Printer = {
   },
 
   async _cloud(jobs, order, settings){
-    if (!Sync.isCloud()){
-      toast("Cloud print needs cloud sync enabled (Settings → Cloud Sync).", "warning", 5000);
-      return { ok:false, error:"cloud disabled" };
+    if (settings.firebase_enabled !== "1"){
+      toast("Cloud print needs Firebase enabled (Settings → Cloud).", "warning", 5000);
+      return { ok:false, error:"firebase disabled" };
     }
     try{
       const all = [];
       for (const j of jobs) for (const b of j.bytes) all.push(b);
-      await PrintQueue.push({
+      await CloudSync.queuePrintJob({
         printer_name: settings.printer_name || "",
         order_no: order.no || "",
         cut: settings.printer_cut || "partial",
@@ -1868,7 +1844,7 @@ const Printer = {
         copies: jobs.length,
         data: all,
       });
-      toast("☁  Print job queued — the store agent will print it", "success");
+      toast("☁  Print job queued — store agent will print it", "success");
       return { ok:true };
     }catch(e){
       toast("Cloud print failed: " + e.message, "error", 6000);
@@ -1925,9 +1901,9 @@ const Printer = {
         }catch(e){ toast("Print agent failed: " + e.message,"error",5000); return { ok:false }; }
       }
       if (mode === "cloud"){
-        if (!Sync.isCloud()){ toast("Cloud print needs cloud sync","warning"); return { ok:false }; }
+        if (settings.firebase_enabled !== "1"){ toast("Cloud print needs Firebase","warning"); return { ok:false }; }
         try{
-          await PrintQueue.push({
+          await CloudSync.queuePrintJob({
             printer_name: settings.printer_name || "",
             order_no: "CLOSE-CASH",
             cut: settings.printer_cut || "partial",
@@ -2025,9 +2001,7 @@ const POSPage = {
   updateCartFab(){
     const fab = document.getElementById("cart-fab");
     if (!fab) return;
-    const cart = document.getElementById("pos-cart");
-    if (!cart) return;
-    const open = cart.classList.contains("open");
+    const open = document.getElementById("pos-cart").classList.contains("open");
     const items = this.current_order ? this.current_order.items : [];
     if (isMobile() && App.page === "pos" && !open) fab.classList.remove("hidden");
     else fab.classList.add("hidden");
@@ -2051,11 +2025,11 @@ const POSPage = {
     const list = document.getElementById("cust-list");
     const q = (document.getElementById("cust-input").value||"").toLowerCase();
     const rows = DB.customersList("").filter(c =>
-      !q || String(c.name||"").toLowerCase().includes(q) ||
-      String(c.phone||"").toLowerCase().includes(q));
+      !q || String(c.name||"").toLowerCase().includes(q) || String(c.phone||"").toLowerCase().includes(q));
     let html = `<div class="item" data-id=""><b>— Walk-in / No customer —</b></div>`;
     html += rows.map(c =>
-      `<div class="item" data-id="${escapeHtml(c.id)}">${escapeHtml(c.name)}${c.phone ? ` <span class="ph">• ${escapeHtml(c.phone)}</span>` : ""}</div>`
+      `<div class="item" data-id="${c.id}">${escapeHtml(c.name)}${
+        c.phone ? ` <span class="ph">• ${escapeHtml(c.phone)}</span>` : ""}</div>`
     ).join("");
     list.innerHTML = html;
     list.querySelectorAll(".item").forEach(el=>{
@@ -2063,7 +2037,7 @@ const POSPage = {
         const id = el.dataset.id;
         if (!id) document.getElementById("cust-input").value = "";
         else {
-          const c = DB.byId("customers", id);
+          const c = DB.customers.find(x=>x.id === Number(id));
           if (c) document.getElementById("cust-input").value = c.name;
         }
         list.classList.remove("on");
@@ -2074,8 +2048,7 @@ const POSPage = {
   resolveCustomer(){
     const text = document.getElementById("cust-input").value.trim();
     if (!text) return { id:null, name:"", phone:"" };
-    const c = DB.customers.find(x =>
-      String(x.name||"").toLowerCase() === text.toLowerCase());
+    const c = DB.customers.find(x=>String(x.name||"").toLowerCase() === text.toLowerCase());
     return c ? { id:c.id, name:c.name, phone:c.phone||"" }
              : { id:null, name:text, phone:"" };
   },
@@ -2087,12 +2060,12 @@ const POSPage = {
     const cats = DB.categoriesSorted();
     let html = `<button class="btn chip ${this.current_cat == null ? "active" : ""}" data-id="">All</button>`;
     for (const c of cats){
-      html += `<button class="btn chip ${String(this.current_cat) === String(c.id) ? "active" : ""}" data-id="${escapeHtml(c.id)}">${escapeHtml(c.name)}</button>`;
+      html += `<button class="btn chip ${this.current_cat === c.id ? "active" : ""}" data-id="${c.id}">${escapeHtml(c.name)}</button>`;
     }
     bar.innerHTML = html;
     bar.querySelectorAll("button").forEach(b=>{
       b.addEventListener("click", ()=>{
-        this.current_cat = b.dataset.id || null;
+        this.current_cat = b.dataset.id ? Number(b.dataset.id) : null;
         this.refreshCategories(); this.renderProducts();
       });
     });
@@ -2103,33 +2076,32 @@ const POSPage = {
     const prods = DB.productsList({ search: this.search, category_id: this.current_cat });
     let html = "";
     for (const p of prods){
-      if (p.track_stock && Number(p.stock) <= 0) continue;
-      const lowStock = p.track_stock && Number(p.stock) <= Number(p.low_stock);
-      html += `<div class="product-card" data-id="${escapeHtml(p.id)}">
+      if (p.track_stock && p.stock <= 0) continue;
+      const lowStock = p.track_stock && p.stock <= p.low_stock;
+      html += `<div class="product-card" data-id="${p.id}">
         <div class="emoji">${escapeHtml(p.emoji||"🍕")}</div>
         <div class="name">${escapeHtml(p.name)}</div>
-        ${lowStock ? `<div class="badge">● ${Number(p.stock)|0}</div>` : ""}
+        ${lowStock ? `<div class="badge">● ${p.stock|0}</div>` : ""}
       </div>`;
     }
-    if (!html) html = `<div class="faint" style="padding:20px;">No products.</div>`;
     grid.innerHTML = html;
     grid.querySelectorAll(".product-card").forEach(card=>{
       card.addEventListener("click", ()=>{
-        const p = DB.getProduct(card.dataset.id);
+        const p = DB.getProduct(Number(card.dataset.id));
         if (p) this.addProduct(p);
       });
     });
   },
 
   addProduct(p){
-    if (p.track_stock && Number(p.stock) <= 0){ toast(`${p.name} is out of stock`, "warning"); return; }
+    if (p.track_stock && p.stock <= 0){ toast(`${p.name} is out of stock`, "warning"); return; }
     if (p.has_options) this.showOptionDialog(p);
     else this.addItemToCart(p, 1, [], Number(p.price), "");
   },
 
   addItemToCart(p, qty, options, unit, note){
     this.current_order.items.push({
-      key: uid("line"),
+      key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       product_id: p.id, name: p.name, emoji: p.emoji,
       qty, unit, options, note: note || "", line: unit * qty,
     });
@@ -2156,11 +2128,17 @@ const POSPage = {
         const show = isExtras || !largeOnly || isLarge;
 
         let hint;
-        if (isExtras) hint = ` <span class="faint">(optional · tap to toggle)</span>`;
-        else if (isFlavor && largeOnly) hint = ` <span class="faint">(choose 1 or 2)</span>`;
-        else if (grp.multi && grp.max_choices) hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
-        else if (grp.multi) hint = " <span class='faint'>(multiple)</span>";
-        else hint = "";
+        if (isExtras){
+          hint = ` <span class="faint">(optional · tap to toggle)</span>`;
+        } else if (isFlavor && largeOnly){
+          hint = ` <span class="faint">(choose 1 or 2)</span>`;
+        } else if (grp.multi && grp.max_choices){
+          hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
+        } else if (grp.multi){
+          hint = " <span class='faint'>(multiple)</span>";
+        } else {
+          hint = "";
+        }
 
         html += `<div class="opt-group" style="display:${show?"block":"none"};">
           <h3>${escapeHtml(grp.name)}${hint}</h3>
@@ -2273,15 +2251,15 @@ const POSPage = {
 
   renderCart(){
     const wrap = document.getElementById("cart-list");
-    if (!wrap) return;
-    const items = this.current_order ? this.current_order.items : [];
+    if (!wrap || !this.current_order) return;
+    const items = this.current_order.items;
     if (!items.length){
       wrap.innerHTML = `<div class="cart-empty">Cart is empty<br>Click a product to add it</div>`;
       return;
     }
     const s = DB.settings;
     wrap.innerHTML = items.map(it=>{
-      const opts = optLabels(it).join(", ");
+      const opts = (it.options||[]).map(o=>o.label).join(", ");
       const note = (it.note||"").trim();
       return `<div class="cart-line" data-key="${escapeHtml(it.key)}">
         <div class="info">
@@ -2331,20 +2309,19 @@ const POSPage = {
     if (!this.current_order) return;
     const s = DB.settings;
     const subtotal = this.current_order.items.reduce((a,i)=>a + (Number(i.line)||0), 0);
-    const discEl = document.getElementById("disc-in");
-    let disc = Number(discEl ? discEl.value : 0) || 0;
+    let disc = Number((document.getElementById("disc-in")||{}).value) || 0;
     disc = Math.max(0, disc);
     const base = Math.max(0, subtotal - disc);
     const tax = 0;
     const delivery = Number(DB.settings.delivery_fee) || 0;
     const grand = base + tax + delivery;
     Object.assign(this.current_order, { subtotal, discount:disc, tax, delivery, total:grand });
-    const elSub = document.getElementById("sum-sub");
-    if (elSub){
-      elSub.textContent   = fmtMoneyDual(subtotal, s);
-      document.getElementById("sum-del").textContent   = fmtMoneyDual(delivery, s);
-      document.getElementById("sum-grand").textContent = fmtMoneyDual(grand, s);
-    }
+    const sub = document.getElementById("sum-sub");
+    const del = document.getElementById("sum-del");
+    const gr  = document.getElementById("sum-grand");
+    if (sub) sub.textContent   = fmtMoneyDual(subtotal, s);
+    if (del) del.textContent   = fmtMoneyDual(delivery, s);
+    if (gr)  gr.textContent    = fmtMoneyDual(grand, s);
     this.updateCartFab();
   },
 
@@ -2356,14 +2333,14 @@ const POSPage = {
     let html = `<button class="btn chip" data-id="new">+ New</button>`;
     for (const o of orders){
       const num = String(o.order_no||"").split("-").pop();
-      html += `<button class="btn chip ${String(o.id) === String(curId) ? "active" : ""}" data-id="${escapeHtml(o.id)}">#${escapeHtml(num)}</button>`;
+      html += `<button class="btn chip ${o.id === curId ? "active" : ""}" data-id="${o.id}">#${escapeHtml(num)}</button>`;
     }
     bar.innerHTML = html;
     bar.querySelectorAll("button").forEach(b=>{
       b.addEventListener("click", ()=>{
         if (b.dataset.id === "new") this.newOrder();
         else {
-          const o = orders.find(x => String(x.id) === String(b.dataset.id));
+          const o = orders.find(x=>x.id === Number(b.dataset.id));
           if (o) this.loadOrder(o);
         }
       });
@@ -2372,12 +2349,11 @@ const POSPage = {
   loadOrder(o){
     this.current_order = {
       id:o.id, no:o.order_no, type:o.order_type || "Delivery",
-      items: (o.items||[]).map((i, idx)=>({
-        key: uid("line") + "_" + idx,
-        product_id:i.product_id, name:i.name, emoji:"",
-        qty:i.qty, unit:i.unit,
-        options: optLabels(i).map(l => ({ label:l })),
-        note: i.note || "", line:i.line,
+      items: o.items.map(i=>({
+        key:String(i.id), product_id:i.product_id, name:i.name, emoji:"",
+        qty:i.qty, unit:i.unit_price,
+        options: String(i.options||"").split(",").map(t=>({label:t.trim()})).filter(x=>x.label),
+        note: i.note||"", line:i.line_total,
       })),
       customer_id:o.customer_id, customer_name:o.customer_name || "",
       customer_phone:o.customer_phone || "",
@@ -2389,18 +2365,15 @@ const POSPage = {
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
     if (isMobile()) this.openCartSheet();
   },
-  async newOrder(){
-    const no = await DB.nextOrderNo();
+  newOrder(){
     this.current_order = {
-      id:null, no, type:"Delivery",
+      id:null, no: DB.nextOrderNo(), type:"Delivery",
       items:[], customer_id:null, customer_name:"", customer_phone:"",
       discount:0, delivery:0, subtotal:0, tax:0, total:0,
     };
-    const lbl = document.getElementById("pos-order-lbl");
-    if (lbl) lbl.textContent = "Order " + no + "  (new)";
+    document.getElementById("pos-order-lbl").textContent = "Order " + this.current_order.no + "  (new)";
     this.setCustomer(null, "");
-    const d = document.getElementById("disc-in");
-    if (d) d.value = "0";
+    document.getElementById("disc-in").value = "0";
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
   },
   clearOrder(){
@@ -2410,7 +2383,7 @@ const POSPage = {
     document.getElementById("disc-in").value = "0";
     this.renderCart(); this.recalc(); this.updateCartFab();
   },
-  async holdOrder(){
+  holdOrder(){
     if (!this.current_order || !this.current_order.items.length){
       toast("Nothing to hold", "warning"); return;
     }
@@ -2418,11 +2391,11 @@ const POSPage = {
     this.current_order.customer_id = id;
     this.current_order.customer_name = name;
     this.current_order.customer_phone = phone;
-    this.current_order.user_id = App.user ? App.user.id : null;
-    await DB.saveOrder(this.current_order, "open");
-    toast(`Order ${this.current_order.no} held`, "success");
+    DB.saveOrder(this.current_order, "open");
+    DB.saveAll();
+    toast(`Order ${this.current_order.no} held — visible on all devices`, "success");
     this.renderTabs();
-    await this.newOrder();
+    this.newOrder();
     if (isMobile()) this.closeCartSheet();
   },
 
@@ -2471,21 +2444,25 @@ const POSPage = {
     this.current_order.payment_method = "Cash";
     this.current_order.user_id = App.user ? App.user.id : null;
 
+    DB.saveOrder(this.current_order, "paid");
+    DB.deductStock(this.current_order);
+    DB.saveAll();
+
     const snapshot = {
       id:this.current_order.id, no:this.current_order.no,
       type:this.current_order.type || "Delivery",
       customer_id:id, customer_name:name, customer_phone:phone,
       items:this.current_order.items.map(i=>({
         name:i.name, qty:i.qty, unit:i.unit, line:i.line,
-        options: optLabels(i), note:i.note||"",
+        options:i.options||[], note:i.note||"",
       })),
       subtotal:this.current_order.subtotal, discount:this.current_order.discount,
       tax:this.current_order.tax, delivery:this.current_order.delivery,
       total:this.current_order.total, payment_method:"Cash",
     };
 
-    await DB.saveOrder(this.current_order, "paid");
-    await DB.deductStock(snapshot);
+    /* Optional reporting push (unchanged remote-connection feature) */
+    CloudSync.pushOrder(snapshot);
 
     const S = DB.settings;
     const auto = S.printer_auto === "1";
@@ -2502,7 +2479,7 @@ const POSPage = {
       ReceiptDialog.show(snapshot);
     }
 
-    await this.newOrder();
+    this.newOrder();
     if (isMobile()) this.closeCartSheet();
   },
 };
@@ -2555,7 +2532,7 @@ const ProductsPage = {
           <thead><tr>
             <th style="width:55px;">Emoji</th><th>Name</th><th>Category</th>
             <th>Price</th><th>Cost</th><th>Stock</th><th>Options</th>
-            <th style="width:150px;">Actions</th>
+            <th style="width:140px;">Actions</th>
           </tr></thead>
           <tbody id="prod-tbody"></tbody>
         </table>
@@ -2564,14 +2541,11 @@ const ProductsPage = {
       this.search = e.target.value; this.render();
     });
     document.getElementById("add-product").addEventListener("click", ()=>this.edit(null));
-    document.getElementById("add-cat").addEventListener("click", async ()=>{
+    document.getElementById("add-cat").addEventListener("click", ()=>{
       const name = prompt("Category name:");
       if (name && name.trim()){
-        const maxSort = DB.categories.reduce((m,c)=>Math.max(m, (c.sort_order|0)+1), 0);
-        await DB.put("categories", {
-          name: name.trim(), sort_order: maxSort, created_at: nowIso(),
-        });
-        toast(`Category '${name.trim()}' added — visible on every device`, "success");
+        DB.saveCategory({ name: name.trim(), sort_order:99 });
+        toast(`Category '${name}' added`, "success");
         POSPage.refreshCategories();
       }
     });
@@ -2583,11 +2557,11 @@ const ProductsPage = {
     const tb = document.getElementById("prod-tbody");
     if (!tb) return;
     tb.innerHTML = rows.map(p=>{
-      const cat = p.category_id ? DB.byId("categories", p.category_id) : null;
-      const stock = p.track_stock ? String(Number(p.stock)|0) : "—";
+      const cat = p.category_id ? DB.categories.find(c=>c.id === p.category_id) : null;
+      const stock = p.track_stock ? String(p.stock|0) : "—";
       const hasCo = !!(p.custom_options||"").trim();
       const opts = hasCo ? "Custom" : (p.has_options ? "Yes" : "No");
-      return `<tr data-id="${escapeHtml(p.id)}">
+      return `<tr data-id="${p.id}">
         <td>${escapeHtml(p.emoji||"")}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${escapeHtml(cat ? cat.name : "—")}</td>
@@ -2601,12 +2575,13 @@ const ProductsPage = {
         </td></tr>`;
     }).join("");
     tb.querySelectorAll("tr").forEach(tr=>{
-      const p = DB.getProduct(tr.dataset.id);
+      const p = DB.getProduct(Number(tr.dataset.id));
       tr.querySelectorAll("button").forEach(b=>{
-        b.addEventListener("click", async ()=>{
+        b.addEventListener("click", ()=>{
           if (b.dataset.act === "edit") this.edit(p);
           else if (confirm(`Delete product '${p.name}'?`)){
-            await DB.deleteProduct(p.id);
+            DB.deleteProduct(p.id);
+            DB.saveAll();
             this.render(); POSPage.renderProducts();
           }
         });
@@ -2624,12 +2599,12 @@ const ProductsPage = {
         <div class="form-row"><label>Emoji</label><input id="p-emoji" value="${escapeHtml(p.emoji||"🍕")}"></div>
         <div class="form-row"><label>Category</label>
           <select id="p-cat"><option value="">— none —</option>
-            ${cats.map(c=>`<option value="${escapeHtml(c.id)}" ${String(p.category_id)===String(c.id) ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+            ${cats.map(c=>`<option value="${c.id}" ${p.category_id === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
           </select></div>
-        <div class="form-row"><label>Price</label><input id="p-price" type="number" value="${Number(p.price)|0}" step="1000"></div>
-        <div class="form-row"><label>Cost</label><input id="p-cost" type="number" value="${Number(p.cost)|0}" step="1000"></div>
-        <div class="form-row"><label>Stock</label><input id="p-stock" type="number" value="${Number(p.stock)|0}"></div>
-        <div class="form-row"><label>Low stock</label><input id="p-low" type="number" value="${Number(p.low_stock)|0}"></div>
+        <div class="form-row"><label>Price</label><input id="p-price" type="number" value="${p.price|0}" step="1000"></div>
+        <div class="form-row"><label>Cost</label><input id="p-cost" type="number" value="${p.cost|0}" step="1000"></div>
+        <div class="form-row"><label>Stock</label><input id="p-stock" type="number" value="${p.stock|0}"></div>
+        <div class="form-row"><label>Low stock</label><input id="p-low" type="number" value="${p.low_stock|0}"></div>
         <div class="form-row checkbox"><label><input type="checkbox" id="p-track" ${p.track_stock?"checked":""}> Track stock</label></div>
         <div class="form-row checkbox"><label><input type="checkbox" id="p-opts" ${p.has_options?"checked":""}> Has options</label></div>
         <div class="form-row checkbox"><label><input type="checkbox" id="p-active" ${p.active?"checked":""}> Active</label></div>
@@ -2641,7 +2616,7 @@ const ProductsPage = {
         <button class="btn primary" id="p-save">Save</button>
       </div>`);
     document.getElementById("p-cancel").addEventListener("click", ()=>Modal.close());
-    document.getElementById("p-save").addEventListener("click", async ()=>{
+    document.getElementById("p-save").addEventListener("click", ()=>{
       const name = document.getElementById("p-name").value.trim();
       if (!name){ toast("Name is required", "warning"); return; }
       const custom = document.getElementById("p-custom").value.trim();
@@ -2653,7 +2628,7 @@ const ProductsPage = {
       }
       const data = {
         name, emoji: document.getElementById("p-emoji").value.trim()||"🍕",
-        category_id: document.getElementById("p-cat").value || null,
+        category_id: Number(document.getElementById("p-cat").value)||null,
         price: Number(document.getElementById("p-price").value)||0,
         cost: Number(document.getElementById("p-cost").value)||0,
         stock: Number(document.getElementById("p-stock").value)||0,
@@ -2663,7 +2638,8 @@ const ProductsPage = {
         active: document.getElementById("p-active").checked ? 1 : 0,
         custom_options: custom,
       };
-      await DB.saveProduct(data, p.id);
+      DB.saveProduct(data, p.id);
+      DB.saveAll();
       Modal.close(); this.render(); POSPage.renderProducts();
       toast("Saved — synced to all devices", "success");
     });
@@ -2701,7 +2677,7 @@ const CustomersPage = {
     const tb = document.getElementById("cust-tbody");
     if (!tb) return;
     tb.innerHTML = rows.map(c=>`
-      <tr data-id="${escapeHtml(c.id)}">
+      <tr data-id="${c.id}">
         <td>${escapeHtml(c.name)}</td>
         <td>${escapeHtml(c.phone||"")}</td>
         <td>${escapeHtml(c.address||"")}</td>
@@ -2710,12 +2686,13 @@ const CustomersPage = {
           <button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>
         </td></tr>`).join("");
     tb.querySelectorAll("tr").forEach(tr=>{
-      const c = DB.byId("customers", tr.dataset.id);
+      const c = DB.customers.find(x=>x.id === Number(tr.dataset.id));
       tr.querySelectorAll("button").forEach(b=>{
-        b.addEventListener("click", async ()=>{
+        b.addEventListener("click", ()=>{
           if (b.dataset.act === "edit") this.edit(c);
           else if (confirm(`Delete customer '${c.name}'?`)){
-            await DB.deleteCustomer(c.id);
+            DB.deleteCustomer(c.id);
+            DB.saveAll();
             this.render();
           }
         });
@@ -2736,16 +2713,18 @@ const CustomersPage = {
         <button class="btn primary" id="c-save">Save</button>
       </div>`);
     document.getElementById("c-cancel").addEventListener("click", ()=>Modal.close());
-    document.getElementById("c-save").addEventListener("click", async ()=>{
+    document.getElementById("c-save").addEventListener("click", ()=>{
       const name = document.getElementById("c-name").value.trim();
       if (!name){ toast("Name is required", "warning"); return; }
       const data = {
         name, phone: document.getElementById("c-phone").value.trim(),
         address: document.getElementById("c-addr").value.trim(),
       };
-      await DB.saveCustomer(data, c.id);
+      DB.saveCustomer(data, c.id);
+      DB.saveAll();
       Modal.close(); this.render();
       toast("Saved", "success");
+      if (isNew) CloudSync.pushCustomer(data);
     });
   },
 };
@@ -2777,12 +2756,12 @@ const ExpensesPage = {
     const rows = DB.expensesList();
     const sym = DB.settings.currency_symbol;
     const total = rows.reduce((a,r)=>a + (Number(r.amount)||0), 0);
-    const totEl = document.getElementById("exp-total");
-    if (totEl) totEl.textContent = `${rows.length} entries  •  Total ${fmtMoney(total, sym)}`;
+    const lbl = document.getElementById("exp-total");
+    if (lbl) lbl.textContent = `${rows.length} entries  •  Total ${fmtMoney(total, sym)}`;
     const tb = document.getElementById("exp-tbody");
     if (!tb) return;
     tb.innerHTML = rows.map(r=>`
-      <tr data-id="${escapeHtml(r.id)}">
+      <tr data-id="${r.id}">
         <td>${escapeHtml(r.spent_on||"")}</td>
         <td>${escapeHtml(r.category||"")}</td>
         <td>${escapeHtml(r.description||"")}</td>
@@ -2792,12 +2771,13 @@ const ExpensesPage = {
           <button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>
         </td></tr>`).join("");
     tb.querySelectorAll("tr").forEach(tr=>{
-      const e = DB.byId("expenses", tr.dataset.id);
+      const e = DB.expenses.find(x=>x.id === Number(tr.dataset.id));
       tr.querySelectorAll("button").forEach(b=>{
-        b.addEventListener("click", async ()=>{
+        b.addEventListener("click", ()=>{
           if (b.dataset.act === "edit") this.edit(e);
           else if (confirm("Delete this expense?")){
-            await DB.deleteExpense(e.id);
+            DB.deleteExpense(e.id);
+            DB.saveAll();
             this.render();
           }
         });
@@ -2815,7 +2795,7 @@ const ExpensesPage = {
           <datalist id="exp-cats">${cats.map(c=>`<option value="${c}">`).join("")}</datalist>
         </div>
         <div class="form-row"><label>Description</label><input id="e-desc" value="${escapeHtml(e.description)}"></div>
-        <div class="form-row"><label>Amount</label><input id="e-amount" type="number" value="${Number(e.amount)|0}" step="1000"></div>
+        <div class="form-row"><label>Amount</label><input id="e-amount" type="number" value="${e.amount|0}" step="1000"></div>
         <div class="form-row"><label>Date</label><input id="e-date" type="date" value="${escapeHtml(e.spent_on||todayStr())}"></div>
       </div>
       <div class="m-foot">
@@ -2823,14 +2803,15 @@ const ExpensesPage = {
         <button class="btn primary" id="e-save">Save</button>
       </div>`);
     document.getElementById("e-cancel").addEventListener("click", ()=>Modal.close());
-    document.getElementById("e-save").addEventListener("click", async ()=>{
+    document.getElementById("e-save").addEventListener("click", ()=>{
       const data = {
         category: document.getElementById("e-cat").value.trim()||"General",
         description: document.getElementById("e-desc").value.trim(),
         amount: Number(document.getElementById("e-amount").value)||0,
         spent_on: document.getElementById("e-date").value||todayStr(),
       };
-      await DB.saveExpense(data, e.id);
+      DB.saveExpense(data, e.id);
+      DB.saveAll();
       Modal.close(); this.render(); toast("Saved", "success");
     });
   },
@@ -2876,6 +2857,7 @@ const ReportsPage = {
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <h3 style="flex:1; min-width:120px;">💵 Close Cash</h3>
           <button class="btn primary" id="rep-print-cc">🖨  Print Close Cash</button>
+          <button class="btn ghost" id="rep-sync-cc">☁  Sync to Firebase</button>
         </div>
         <div class="muted" id="rep-cc-info" style="margin-top:8px;"></div>
       </div>`;
@@ -2897,6 +2879,12 @@ const ReportsPage = {
       const text = buildCloseCashText(this.from, this.to, DB.settings);
       await Printer.printText(text, DB.settings);
     });
+    document.getElementById("rep-sync-cc").addEventListener("click", async ()=>{
+      if (DB.settings.firebase_enabled !== "1"){ toast("Enable Cloud Sync in Settings first", "warning"); return; }
+      const res = await CloudSync.pushCloseCash(this.from, this.to);
+      if (res.ok) toast("Close Cash synced to Firebase", "success");
+      else toast("Firebase sync failed: " + res.info, "error", 5000);
+    });
     this.render();
   },
   render(){
@@ -2914,7 +2902,7 @@ const ReportsPage = {
       <div class="card metric-card"><div class="lbl">Net Profit</div><div class="val">${fmtMoney(profit, sym)}</div></div>`;
     const tTop = document.getElementById("rep-top");
     if (tTop) tTop.innerHTML = DB.topProducts(s,e).map(r=>
-      `<tr><td>${escapeHtml(r.name)}</td><td>${Number(r.qty)|0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+      `<tr><td>${escapeHtml(r.name)}</td><td>${r.qty|0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
     const tCat = document.getElementById("rep-cat");
     if (tCat) tCat.innerHTML = DB.salesByCategory(s,e).map(r=>
       `<tr><td>${escapeHtml(r.category)}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
@@ -2938,7 +2926,7 @@ const ReportsPage = {
 /* ═══════════════════ SETTINGS PAGE ═══════════════════ */
 const SettingsPage = {
   initialized:false,
-  _diagTimer:null,
+  _timer:null,
   init(){
     if (this.initialized) return;
     this.initialized = true;
@@ -2965,29 +2953,38 @@ const SettingsPage = {
               <select id="s-theme"><option value="light">light</option><option value="dark">dark</option></select></div>
           </div>
         </div>
-        <button class="btn primary" id="s-save">Save Settings (all devices)</button>
+        <button class="btn primary" id="s-save">Save Settings</button>
       </div>
 
       <div class="card" style="padding:20px; margin-bottom:14px;">
-        <h3 style="margin-bottom:8px;">☁  Multi-Device Sync (Firebase Firestore)</h3>
+        <h3 style="margin-bottom:8px;">☁  Shared Database (multi-device sync)</h3>
         <div class="faint" style="font-size:11px; margin-bottom:12px; line-height:1.6;">
-          All devices that open this page share the same products, customers,
-          orders, expenses and settings in real time.<br>
-          Project: <b>${escapeHtml(FIREBASE_CONFIG.projectId)}</b> ·
-          Auth: <b>${escapeHtml(FIREBASE_CONFIG.authDomain)}</b>
+          All devices (up to 4+) share <b>one</b> cloud database: products, orders, sales,
+          customers, expenses, stock and settings stay identical everywhere in real time.<br>
+          Project: <b>${FIREBASE_CONFIG.projectId}</b> · Auth: anonymous.
         </div>
-        <div class="form-row checkbox"><label>
-          <input type="checkbox" id="s-cloud-on"> Sync this device with the cloud
-          <span class="faint">(device preference only — does not affect other devices)</span></label></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
-          <button class="btn primary" id="s-cloud-save">Apply</button>
-          <button class="btn" id="s-cloud-reconnect">🔄 Reconnect</button>
-          <button class="btn ghost" id="s-cloud-force">⬆  Force push local data</button>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-fb-on"> Enable shared cloud database</label></div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 12px;">
+          <button class="btn primary" id="s-save-fb">Save cloud settings</button>
+          <button class="btn ghost" id="s-push-all">⬆ Push this device's data</button>
+          <button class="btn ghost" id="s-test-fb">Test connection</button>
         </div>
-        <div style="margin-top:14px;">
+
+        <div style="margin-top:6px;">
           <h3 style="margin-bottom:6px;">Sync diagnostics</h3>
           <div class="diag" id="s-diag-sync">…</div>
         </div>
+
+        <h3 style="margin:14px 0 6px;">Reporting collections (optional)</h3>
+        <div class="faint" style="font-size:11px; margin-bottom:8px;">
+          Used by the separate reporting push and the cloud print queue. Leave as-is unless you know why.
+        </div>
+        <div class="form-row"><label>Orders collection</label><input id="s-fb-orders"></div>
+        <div class="form-row"><label>Customers collection</label><input id="s-fb-cust"></div>
+        <div class="form-row"><label>Close-cash collection</label><input id="s-fb-cash"></div>
+        <div class="form-row"><label>Print jobs collection</label><input id="s-fb-jobs"></div>
+        <div class="diag" id="s-diag-fb">…</div>
       </div>
 
       <div class="card" style="padding:20px; margin-bottom:14px;">
@@ -2995,8 +2992,8 @@ const SettingsPage = {
         <div class="faint" style="font-size:11px; margin-bottom:12px; line-height:1.6;">
           <b>browser</b> — OS print dialog (no real cut).<br>
           <b>usb</b> — raw ESC/POS via WebUSB. Real cut. Desktop Chrome/Edge only, HTTPS/localhost.<br>
-          <b>agent</b> — POST raw bytes to a Print Agent on your LAN.<br>
-          <b>cloud</b> — queue the job in Firestore; the store agent picks it up. Works from anywhere.
+          <b>agent</b> — POST raw bytes to a Print Agent on your LAN (works on phone while on store Wi-Fi).<br>
+          <b>cloud</b> — queue the job in Firestore; agent at the store picks it up. Works from anywhere.
         </div>
 
         <div class="form-row"><label>Printer mode</label>
@@ -3024,8 +3021,6 @@ const SettingsPage = {
           <input id="s-agent-url" placeholder="http://192.168.1.50:17777"></div>
         <div class="form-row"><label>Agent token (optional)</label>
           <input id="s-agent-token" placeholder="shared secret"></div>
-        <div class="form-row"><label>Cloud print collection</label>
-          <input id="s-fb-jobs" placeholder="print_jobs"></div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
           <button class="btn primary" id="s-save-printer">Save printer</button>
@@ -3037,14 +3032,14 @@ const SettingsPage = {
         </div>
 
         <div style="margin-top:14px;">
-          <h3 style="margin-bottom:6px;">Printer diagnostics</h3>
+          <h3 style="margin-bottom:6px;">Diagnostics</h3>
           <div class="diag" id="s-diag">…</div>
         </div>
       </div>
 
       <div class="card" style="padding:20px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-          <h3 style="flex:1;">👤 Users (shared across devices)</h3>
+          <h3 style="flex:1;">👤 Users</h3>
           <button class="btn" id="s-add-user">+ Add User</button>
         </div>
         <div class="table-wrap">
@@ -3070,8 +3065,6 @@ const SettingsPage = {
     $("s-footer").value   = S.receipt_footer || "";
     $("s-theme").value    = S.theme || "light";
 
-    $("s-cloud-on").checked = S.firebase_enabled === "1";
-
     $("s-printer").value     = S.printer_name || "";
     $("s-copies").value      = S.printer_copies || "2";
     $("s-cut").value         = S.printer_cut || "partial";
@@ -3079,7 +3072,12 @@ const SettingsPage = {
     $("s-auto").checked      = S.printer_auto === "1";
     $("s-agent-url").value   = S.printer_agent_url || "";
     $("s-agent-token").value = S.printer_agent_token || "";
-    $("s-fb-jobs").value     = S.firebase_collection_print_jobs || "print_jobs";
+
+    $("s-fb-on").checked   = S.firebase_enabled === "1";
+    $("s-fb-orders").value = S.firebase_collection_orders || "orders";
+    $("s-fb-cust").value   = S.firebase_collection_customers || "customers";
+    $("s-fb-cash").value   = S.firebase_collection_cash || "close_cash";
+    $("s-fb-jobs").value   = S.firebase_collection_print_jobs || "print_jobs";
 
     let currentMode = S.printer_mode || "browser";
     const seg = $("s-mode-seg");
@@ -3091,109 +3089,198 @@ const SettingsPage = {
       b.addEventListener("click", ()=>{
         currentMode = b.dataset.mode;
         S.printer_mode = currentMode;
-        STORE.set("settings", S);
-        Cloud.setSettings(S).catch(()=>{});
+        DB.save("settings");
+        Persist.putObject("settings", S);
         paintSeg();
-        this.refreshDiag(currentMode);
+        refreshDiag();
       });
     });
 
-    const refreshDiag = (mode)=>{ this.refreshDiag(mode || currentMode); };
-    refreshDiag();
+    const refreshPill = ()=>{
+      const pill = document.getElementById("printer-pill");
+      const txt  = document.getElementById("printer-pill-txt");
+      if (!pill || !txt) return;
+      pill.classList.remove("ok","bad","warn");
+      if (currentMode === "usb"){
+        if (!USBPrinter.isSupported()){ pill.classList.add("bad"); txt.textContent = "USB n/a"; }
+        else if (USBPrinter.isConnected()){ pill.classList.add("ok"); txt.textContent = "USB ready"; }
+        else { pill.classList.add("warn"); txt.textContent = "USB off"; }
+      } else if (currentMode === "agent"){
+        pill.classList.add(S.printer_agent_url ? "ok" : "warn");
+        txt.textContent = S.printer_agent_url ? "Agent" : "Agent ?";
+      } else if (currentMode === "cloud"){
+        pill.classList.add(S.firebase_enabled === "1" ? "ok" : "bad");
+        txt.textContent = S.firebase_enabled === "1" ? "Cloud" : "Cloud off";
+      } else {
+        txt.textContent = "Browser";
+      }
+    };
 
-    if (this._diagTimer) clearInterval(this._diagTimer);
-    this._diagTimer = setInterval(()=>{
-      if (!document.body.contains($("s-diag"))){ clearInterval(this._diagTimer); return; }
-      refreshDiag();
-      this.refreshSyncDiag();
+    const refreshDiag = ()=>{
+      const el_ = $("s-diag");
+      if (!el_) return;
+      const secure = isSecureContext_();
+      const usbSup = USBPrinter.isSupported();
+      const usbCon = USBPrinter.isConnected();
+      const fbOn   = S.firebase_enabled === "1";
+      const lines = [
+        `Mode: ${currentMode}`,
+        `Secure context: ${secure ? '<span class="ok">yes</span>' : '<span class="bad">no</span> (needed for WebUSB & crypto)'}`,
+        `crypto.subtle: ${(crypto && crypto.subtle) ? '<span class="ok">available</span>' : '<span class="warn">fallback used</span>'}`,
+        `WebUSB supported: ${usbSup ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `USB connected: ${usbCon ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Agent URL: ${S.printer_agent_url ? escapeHtml(S.printer_agent_url) : '<span class="warn">not set</span>'}`,
+        `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Print jobs collection: ${escapeHtml(S.firebase_collection_print_jobs || "print_jobs")}`,
+        `Copies: ${escapeHtml(String(S.printer_copies||"2"))} · Cut: ${escapeHtml(S.printer_cut||"partial")} · Drawer: ${S.printer_drawer==="1"?"on":"off"}`,
+      ];
+      el_.innerHTML = lines.join("\n");
+    };
+
+    const refreshSyncDiag = ()=>{
+      const el_ = $("s-diag-sync");
+      if (!el_) return;
+      const online = navigator.onLine;
+      el_.innerHTML = [
+        `Enabled: ${S.firebase_enabled === "1" ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Connection: ${CloudDB.ready ? '<span class="ok">connected</span>' : '<span class="bad">not connected</span>'}`,
+        `Last error: ${CloudDB.error ? '<span class="bad">' + escapeHtml(CloudDB.error) + '</span>' : '<span class="ok">none</span>'}`,
+        `Browser online: ${online ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `Project: ${escapeHtml(FIREBASE_CONFIG.projectId)}`,
+        `Device UID: ${escapeHtml(CloudDB.uid || "—")}`,
+        `Records: products ${DB.products.length} · customers ${DB.customers.length} · orders ${DB.orders.length} · lines ${DB.order_items.length} · expenses ${DB.expenses.length}`,
+      ].join("\n");
+    };
+
+    const refreshFbDiag = ()=>{
+      const el_ = $("s-diag-fb");
+      if (!el_) return;
+      const fbOn = S.firebase_enabled === "1";
+      el_.innerHTML = [
+        `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
+        `Auth (anonymous): ${CloudDB.uid ? '<span class="ok">signed in</span>' : '<span class="warn">not signed in</span>'}`,
+        `Project: ${escapeHtml(FIREBASE_CONFIG.projectId)}`,
+        `Orders: ${escapeHtml(S.firebase_collection_orders || "orders")}`,
+        `Customers: ${escapeHtml(S.firebase_collection_customers || "customers")}`,
+        `Close cash: ${escapeHtml(S.firebase_collection_cash || "close_cash")}`,
+        `Print jobs: ${escapeHtml(S.firebase_collection_print_jobs || "print_jobs")}`,
+      ].join("\n");
+    };
+
+    const refreshAll = ()=>{ refreshPill(); refreshDiag(); refreshSyncDiag(); refreshFbDiag(); };
+    refreshAll();
+
+    if (this._timer) clearInterval(this._timer);
+    this._timer = setInterval(()=>{
+      if (!document.body.contains($("s-diag"))){ clearInterval(this._timer); this._timer = null; return; }
+      refreshAll();
     }, 1500);
-    this.refreshSyncDiag();
 
-    /* ── restaurant settings ── */
-    $("s-save").addEventListener("click", async ()=>{
-      const newTheme = $("s-theme").value;
-      await DB.saveSettings({
-        restaurant_name: $("s-name").value,
-        tagline:         $("s-tagline").value,
-        address:         $("s-address").value,
-        phone:           $("s-phone").value,
-        currency_symbol: $("s-sym").value,
-        secondary_currency: $("s-sec").value,
-        secondary_rate:  $("s-rate").value,
-        delivery_fee:    $("s-delivery").value,
-        receipt_footer:  $("s-footer").value,
-        theme:           newTheme,
+    const pill = document.getElementById("printer-pill");
+    if (pill && !pill._bound){
+      pill._bound = true;
+      pill.addEventListener("click", ()=>{
+        App.nav("settings");
+        setTimeout(()=>{ refreshAll(); $("s-diag")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
       });
-      App.applyTheme(newTheme);
-      toast("Settings saved — pushed to every device", "success");
+    }
+    const cpill = document.getElementById("cloud-pill");
+    if (cpill && !cpill._bound){
+      cpill._bound = true;
+      cpill.addEventListener("click", ()=>{
+        App.nav("settings");
+        setTimeout(()=>{ refreshAll(); $("s-diag-sync")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
+      });
+    }
+
+    $("s-save").addEventListener("click", ()=>{
+      S.restaurant_name = $("s-name").value;
+      S.tagline         = $("s-tagline").value;
+      S.address         = $("s-address").value;
+      S.phone           = $("s-phone").value;
+      S.currency_symbol = $("s-sym").value;
+      S.secondary_currency = $("s-sec").value;
+      S.secondary_rate  = $("s-rate").value;
+      S.delivery_fee    = $("s-delivery").value;
+      S.receipt_footer  = $("s-footer").value;
+      const newTheme = $("s-theme").value;
+      const oldTheme = S.theme;
+      S.theme = newTheme;
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Settings saved — synced to all devices", "success");
+      if (newTheme !== oldTheme) App.applyTheme(newTheme);
       POSPage.refreshCategories(); POSPage.renderProducts(); POSPage.recalc();
     });
 
-    /* ── cloud sync ── */
-    $("s-cloud-save").addEventListener("click", async ()=>{
-      const on = $("s-cloud-on").checked ? "1" : "0";
-      DB.settings.firebase_enabled = on;
-      STORE.set("settings", DB.settings);
-      toast("Cloud setting saved — reloading…", "info", 1500);
-      setTimeout(()=>location.reload(), 800);
-    });
-    $("s-cloud-reconnect").addEventListener("click", ()=>{
-      toast("Reconnecting…", "info", 1500);
-      setTimeout(()=>location.reload(), 700);
-    });
-    $("s-cloud-force").addEventListener("click", async ()=>{
-      if (!Sync.isCloud()){ toast("Cloud sync is off on this device", "warning"); return; }
-      if (!confirm("Push ALL local data of this device to the cloud?\n" +
-                   "This can overwrite data created on other devices.")) return;
-      const btn = $("s-cloud-force");
-      btn.disabled = true;
-      try{
-        const collections = ["categories","products","customers","orders","expenses"];
-        let n = 0;
-        for (const coll of collections){
-          for (const row of DB[coll]){
-            await Cloud.set(coll, row.id, row);
-            n++;
-          }
-        }
-        await Cloud.setSettings(DB.settings);
-        toast(`Pushed ${n} records to the cloud`, "success", 4000);
-      }catch(e){
-        toast("Push failed: " + e.message, "error", 6000);
-      } finally { btn.disabled = false; }
+    $("s-save-printer").addEventListener("click", ()=>{
+      S.printer_mode      = currentMode;
+      S.printer_name      = $("s-printer").value.trim();
+      S.printer_copies    = $("s-copies").value;
+      S.printer_cut       = $("s-cut").value;
+      S.printer_drawer    = $("s-drawer").checked ? "1" : "0";
+      S.printer_auto      = $("s-auto").checked ? "1" : "0";
+      S.printer_agent_url = $("s-agent-url").value.trim();
+      S.printer_agent_token = $("s-agent-token").value.trim();
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Printer settings saved", "success");
+      refreshAll();
     });
 
-    /* ── printer ── */
-    $("s-save-printer").addEventListener("click", async ()=>{
-      await DB.saveSettings({
-        printer_mode:       currentMode,
-        printer_name:       $("s-printer").value.trim(),
-        printer_copies:     $("s-copies").value,
-        printer_cut:        $("s-cut").value,
-        printer_drawer:     $("s-drawer").checked ? "1" : "0",
-        printer_auto:       $("s-auto").checked ? "1" : "0",
-        printer_agent_url:  $("s-agent-url").value.trim(),
-        printer_agent_token:$("s-agent-token").value.trim(),
-        firebase_collection_print_jobs: $("s-fb-jobs").value.trim() || "print_jobs",
-      });
-      toast("Printer settings saved", "success");
-      refreshDiag();
-      App.refreshPills();
+    $("s-save-fb").addEventListener("click", async ()=>{
+      S.firebase_enabled = $("s-fb-on").checked ? "1" : "0";
+      S.firebase_collection_orders    = $("s-fb-orders").value || "orders";
+      S.firebase_collection_customers = $("s-fb-cust").value   || "customers";
+      S.firebase_collection_cash      = $("s-fb-cash").value   || "close_cash";
+      S.firebase_collection_print_jobs= $("s-fb-jobs").value   || "print_jobs";
+      DB.save("settings");
+      Persist.putObject("settings", S);
+      toast("Cloud settings saved", "success");
+
+      if (S.firebase_enabled === "1" && !CloudDB.ready){
+        toast("Connecting…", "info");
+        await CloudDB.init();
+        if (CloudDB.ready){
+          try{ await DB._fetchCloud(); }catch(e){}
+          Realtime.start();
+        }
+      }
+      refreshAll();
+    });
+
+    $("s-push-all").addEventListener("click", ()=>{
+      if (S.firebase_enabled !== "1"){ toast("Enable the shared database first", "warning"); return; }
+      if (!CloudDB.ready){ toast("Not connected to the cloud database", "error"); return; }
+      if (!confirm("Upload THIS device's products, orders, customers, expenses and settings to the shared database?\n\n" +
+                   "Records with the same ID will be overwritten on all devices.")) return;
+      DB.pushAllToCloud();
+      toast("Uploading local data to the shared database…", "info", 4000);
+    });
+
+    $("s-test-fb").addEventListener("click", async ()=>{
+      const res = await FirebaseSync.pushDocument(
+        $("s-fb-orders").value || "orders",
+        { test:true, message:"Hello from Pizza POS", created_at: nowIso() });
+      if (res.ok) toast(`Shared database OK (${res.info})`, "success");
+      else toast("Database test failed: " + res.info, "error", 6000);
+      refreshAll();
     });
 
     $("s-usb-connect").addEventListener("click", async ()=>{
       try{
         const info = await USBPrinter.connect();
         toast(`USB connected (VID ${info.vid} PID ${info.pid})`, "success");
+        refreshAll();
       }catch(e){
         toast("USB connect failed: " + e.message, "error", 6000);
+        refreshAll();
       }
-      refreshDiag(); App.refreshPills();
     });
     $("s-usb-disconnect").addEventListener("click", async ()=>{
       await USBPrinter.disconnect();
       toast("USB printer disconnected", "info");
-      refreshDiag(); App.refreshPills();
+      refreshAll();
     });
     $("s-test-usb").addEventListener("click", async ()=>{
       if (!USBPrinter.isConnected()){ toast("Connect USB first", "warning"); return; }
@@ -3213,9 +3300,9 @@ const SettingsPage = {
       }catch(e){ toast("Agent unreachable: " + e.message, "error", 6000); }
     });
     $("s-test-cloud").addEventListener("click", async ()=>{
-      if (!Sync.isCloud()){ toast("Cloud sync is off", "warning"); return; }
+      if (S.firebase_enabled !== "1"){ toast("Enable the shared database first", "warning"); return; }
       try{
-        await PrintQueue.push({
+        await CloudSync.queuePrintJob({
           printer_name: S.printer_name || "",
           order_no: "TEST-CLOUD",
           cut: S.printer_cut || "partial",
@@ -3227,7 +3314,6 @@ const SettingsPage = {
       }catch(e){ toast("Cloud test failed: " + e.message, "error", 6000); }
     });
 
-    /* ── users ── */
     $("s-add-user").addEventListener("click", async ()=>{
       const u = prompt("Username:"); if (!u) return;
       const p = prompt("Password:"); if (!p) return;
@@ -3236,60 +3322,17 @@ const SettingsPage = {
       try{
         await DB.addUser(u.trim(), p, n, r);
         this.renderUsers();
-        toast("User added — can sign in on any device", "success");
+        toast("User added — synced to all devices", "success");
       }catch(e){ toast("Username already exists", "warning"); }
     });
 
     this.renderUsers();
   },
-
-  refreshDiag(mode){
-    const el_ = document.getElementById("s-diag");
-    if (!el_) return;
-    const S = DB.settings;
-    const secure = isSecureContext_();
-    const usbSup = USBPrinter.isSupported();
-    const usbCon = USBPrinter.isConnected();
-    el_.innerHTML = [
-      `Mode: ${escapeHtml(mode || S.printer_mode || "browser")}`,
-      `Secure context: ${secure ? '<span class="ok">yes</span>' : '<span class="bad">no</span> (needed for WebUSB)'}`,
-      `crypto.subtle: ${(typeof crypto !== "undefined" && crypto.subtle) ? '<span class="ok">available</span>' : '<span class="warn">fallback used</span>'}`,
-      `WebUSB supported: ${usbSup ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
-      `USB connected: ${usbCon ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
-      `Agent URL: ${S.printer_agent_url ? escapeHtml(S.printer_agent_url) : '<span class="warn">not set</span>'}`,
-      `Copies: ${escapeHtml(String(S.printer_copies||"2"))} · Cut: ${escapeHtml(S.printer_cut||"partial")} · Drawer: ${S.printer_drawer==="1"?"on":"off"}`,
-    ].join("\n");
-  },
-
-  refreshSyncDiag(){
-    const el_ = document.getElementById("s-diag-sync");
-    if (!el_) return;
-    const s = Sync;
-    const stateTxt =
-      s.mode === "cloud" && s.state === "online" ? '<span class="ok">connected</span>' :
-      s.state === "connecting" ? '<span class="warn">connecting…</span>' :
-      s.state === "error" ? '<span class="bad">error</span>' :
-      '<span class="warn">local only</span>';
-    const rows = [
-      `Mode: ${s.mode} — ${stateTxt}`,
-      `Browser online: ${navigator.onLine ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
-      `Last sync: ${s.lastSync ? s.lastSync.toLocaleTimeString() : "—"}`,
-      `Project: ${escapeHtml(FIREBASE_CONFIG.projectId)}`,
-      `Signed in as: ${Cloud.auth && Cloud.auth.currentUser ? '<span class="ok">' + escapeHtml(Cloud.auth.currentUser.uid.slice(0,10)) + '…</span>' : '<span class="warn">not signed in</span>'}`,
-      `Categories: ${DB.categories.length} · Products: ${DB.products.length}`,
-      `Customers: ${DB.customers.length} · Orders: ${DB.orders.length}`,
-      `Expenses: ${DB.expenses.length} · Users: ${DB.users.length}`,
-    ];
-    if (s.error) rows.push(`Last error: <span class="bad">${escapeHtml(s.error)}</span>`);
-    el_.innerHTML = rows.join("\n");
-  },
-
   renderUsers(){
     const tb = document.getElementById("s-users-tbody");
     if (!tb) return;
-    const rows = [...DB.users].sort((a,b)=>String(a.username).localeCompare(String(b.username)));
-    tb.innerHTML = rows.map(u=>`
-      <tr data-id="${escapeHtml(u.id)}">
+    tb.innerHTML = DB.users.map(u=>`
+      <tr data-id="${u.id}">
         <td>${escapeHtml(u.username)}</td>
         <td>${escapeHtml(u.full_name||"")}</td>
         <td>${escapeHtml(u.role||"")}</td>
@@ -3297,10 +3340,11 @@ const SettingsPage = {
           `<button class="btn icon" data-act="del" style="color:var(--danger);">Delete</button>`}</td>
       </tr>`).join("");
     tb.querySelectorAll("button[data-act=del]").forEach(b=>{
-      const id = b.closest("tr").dataset.id;
-      b.addEventListener("click", async ()=>{
+      const id = Number(b.closest("tr").dataset.id);
+      b.addEventListener("click", ()=>{
         if (confirm("Delete this user?")){
-          await DB.deleteUser(id);
+          DB.deleteUser(id);
+          DB.saveAll();
           this.renderUsers();
         }
       });
@@ -3332,6 +3376,157 @@ function sampleReceipt(){
     payment_method:"Cash",
   };
 }
+
+/* ═══════════════════ FIREBASE REST (reporting / cloud print) ═══════════════════ */
+function _firestoreValue(v){
+  if (v === null || v === undefined) return { nullValue:null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number"){
+    if (Number.isInteger(v)) return { integerValue: String(v) };
+    return { doubleValue: v };
+  }
+  if (typeof v === "string") return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(_firestoreValue) } };
+  if (typeof v === "object"){
+    const fields = {};
+    for (const k of Object.keys(v)) fields[k] = _firestoreValue(v[k]);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(v) };
+}
+function _firestoreDoc(obj){
+  const fields = {};
+  for (const k of Object.keys(obj)) fields[k] = _firestoreValue(obj[k]);
+  return { fields };
+}
+
+const FirebaseSync = {
+  _idToken: null,
+  _authError: null,
+
+  async _token(){
+    /* Prefer the token already held by the shared-database session */
+    const t = await CloudDB.token();
+    if (t) return t;
+    if (this._idToken) return this._idToken;
+    return await this._signInAnonymous();
+  },
+
+  async _signInAnonymous(){
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_CONFIG.apiKey}`;
+    try{
+      const r = await fetch(url, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ returnSecureToken:true }),
+      });
+      const data = await r.json();
+      if (data && data.idToken){
+        this._idToken = data.idToken;
+        this._authError = null;
+        return this._idToken;
+      }
+      this._idToken = null;
+      this._authError = data && data.error ? (data.error.message || "auth failed") : "no token";
+    }catch(e){
+      this._idToken = null;
+      this._authError = String(e);
+    }
+    return null;
+  },
+
+  async pushDocument(collection, data){
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/${collection}?key=${FIREBASE_CONFIG.apiKey}`;
+    const token = await this._token();
+    const headers = { "Content-Type":"application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    try{
+      const r = await fetch(url, {
+        method:"POST", headers, body: JSON.stringify(_firestoreDoc(data)),
+      });
+      if (r.ok){
+        const j = await r.json().catch(()=> ({}));
+        const name = j && j.name ? j.name.split("/").pop() : "";
+        return { ok:true, info:"HTTP " + r.status, id:name };
+      }
+      const detail = await r.text();
+      let hint = "";
+      if (r.status === 403){
+        hint = token
+          ? " (rules denied write — check Firestore rules)"
+          : " (anonymous auth disabled — enable it in Firebase Console)";
+      }
+      return { ok:false, info:`HTTP ${r.status}${hint}: ${detail.slice(0,220)}` };
+    }catch(e){
+      return { ok:false, info: String(e) };
+    }
+  },
+};
+
+const CloudSync = {
+  _warned: false,
+  enabled(){ return DB.settings.firebase_enabled === "1"; },
+  _col(key, def){ return (DB.settings[key] || def || "").trim() || def; },
+
+  async pushOrder(o){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    const doc = {
+      order_no: o.no, order_type: o.type, customer: o.customer_name||"",
+      customer_id: o.customer_id||null, customer_phone: o.customer_phone||"",
+      subtotal: +o.subtotal||0, discount: +o.discount||0,
+      delivery: +o.delivery||0, total: +o.total||0,
+      currency: (DB.settings.currency_symbol||"LBP ").trim(),
+      payment: o.payment_method||"Cash",
+      created_at: nowIso(),
+      items: (o.items||[]).map(i=>({
+        name:i.name||"", qty:+i.qty||1, unit:+i.unit||0, line:+i.line||0,
+        options:(i.options||[]).map(x=>x.label||""), note:i.note||"",
+      })),
+    };
+    const res = await FirebaseSync.pushDocument(this._col("firebase_collection_orders","orders"), doc);
+    if (!res.ok && this.enabled() && !this._warned){
+      this._warned = true;
+      console.warn("Cloud sync failed:", res.info);
+    }
+    return res;
+  },
+
+  async pushCustomer(c){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    return await FirebaseSync.pushDocument(
+      this._col("firebase_collection_customers","customers"),
+      { name:c.name||"", phone:c.phone||"", address:c.address||"", created_at: nowIso() });
+  },
+
+  async pushCloseCash(start, end){
+    if (!this.enabled()) return { ok:false, info:"disabled" };
+    const cash = DB.cashSummary(start, end);
+    return await FirebaseSync.pushDocument(
+      this._col("firebase_collection_cash","close_cash"),
+      { from:start, to:end, cash_orders:cash.cash_orders, cash_sales:cash.cash_sales,
+        expenses:cash.expenses, expected:cash.expected,
+        currency:(DB.settings.currency_symbol||"LBP ").trim(), created_at: nowIso() });
+  },
+
+  async queuePrintJob(job){
+    if (!this.enabled()) throw new Error("Firebase disabled");
+    const col = this._col("firebase_collection_print_jobs", "print_jobs");
+    const doc = {
+      printer_name: job.printer_name || "",
+      order_no: job.order_no || "",
+      cut: job.cut || "partial",
+      drawer: job.drawer === true,
+      copies: job.copies || 1,
+      data: job.data || [],
+      status: "pending",
+      source: "pizza_pos_web",
+      created_at: nowIso(),
+    };
+    const res = await FirebaseSync.pushDocument(col, doc);
+    if (!res.ok) throw new Error(res.info);
+    return res;
+  },
+};
 
 /* ═══════════════════ PWA ═══════════════════ */
 function setupPWA(){
@@ -3412,36 +3607,29 @@ const App = {
   user: null,
   page: "pos",
   _pagesInited: false,
-  _dataTimer: null,
+  _syncTimer: null,
 
   async init(){
     setupPWA();
-    await DB.load();
+
+    const status = document.getElementById("login-cloud");
+    await DB.load(msg => { if (status) status.textContent = msg ? "☁ " + msg : ""; });
+
     this.applyTheme(DB.settings.theme || "light");
     this.bindLogin();
     this.bindMisc();
-    this.refreshLoginNet();
-    /* start cloud sync in the background — the login screen stays usable */
-    Sync.boot();
-  },
+    SyncStatus.render();
 
-  refreshLoginNet(){
-    const el = document.getElementById("login-net");
-    if (!el) return;
-    const paint = ()=>{
-      if (Sync.state === "connecting") el.textContent = "☁  Connecting to cloud…";
-      else if (Sync.mode === "cloud" && Sync.state === "online")
-        el.textContent = "☁  Cloud connected — data shared with all devices";
-      else if (Sync.state === "error")
-        el.textContent = "⚠  Cloud unavailable — running on this device only";
-      else
-        el.textContent = "📴  Local mode — data stays on this device";
-    };
-    paint();
-    this._loginNetTimer = setInterval(()=>{
-      if (!document.getElementById("login-net")){ clearInterval(this._loginNetTimer); return; }
-      paint();
-    }, 1000);
+    if (status){
+      if (CloudDB.ready){
+        status.innerHTML = "☁ Shared database connected — data syncs across all devices.";
+      } else if (DB.settings.firebase_enabled === "1"){
+        status.innerHTML = "⚠ Shared database unavailable — running on this device's local copy.<br>" +
+          "<span class='faint'>" + escapeHtml(CloudDB.error || "") + "</span>";
+      } else {
+        status.textContent = "Local-only mode (cloud database disabled in Settings).";
+      }
+    }
   },
 
   bindLogin(){
@@ -3455,22 +3643,9 @@ const App = {
       const err = document.getElementById("login-err");
       err.textContent = "";
       if (!u || !p){ err.textContent = "Enter username and password"; return; }
-
-      /* if cloud sync is still starting, wait briefly for the users list */
-      if (!DB.users.length && Sync.state === "connecting"){
-        err.textContent = "Connecting to cloud…";
-        await Sync.waitForUsers(5000);
-        err.textContent = "";
-      }
-
       try{
         const user = await DB.authenticate(u, p);
-        if (!user){
-          err.textContent = DB.users.length
-            ? "Invalid credentials"
-            : "No accounts available — cloud unreachable";
-          return;
-        }
+        if (!user){ err.textContent = "Invalid credentials"; return; }
         this.user = user;
         this.start();
       }catch(e){
@@ -3486,10 +3661,20 @@ const App = {
     window.addEventListener("resize", refresh);
     window.addEventListener("orientationchange", ()=>setTimeout(refresh, 200));
 
+    window.addEventListener("online", ()=>{
+      SyncStatus.set(CloudDB.ready ? "synced" : "local",
+        CloudDB.ready ? "Back online" : "Offline — local data only");
+    });
+    window.addEventListener("offline", ()=>{
+      SyncStatus.set("local", "Offline — changes will sync when back online");
+    });
+
     document.getElementById("theme-btn").addEventListener("click", ()=>{
       const cur = DB.settings.theme || "light";
       const next = cur === "light" ? "dark" : "light";
-      DB.saveSettings({ theme: next });
+      DB.settings.theme = next;
+      DB.save("settings");
+      Persist.putObject("settings", DB.settings);
       this.applyTheme(next);
       const sel = document.getElementById("s-theme");
       if (sel) sel.value = next;
@@ -3498,24 +3683,12 @@ const App = {
     document.querySelectorAll(".navbtn").forEach(b=>{
       b.addEventListener("click", ()=>this.nav(b.dataset.page));
     });
-
-    const syncPill = document.getElementById("sync-pill");
-    if (syncPill) syncPill.addEventListener("click", ()=>this.nav("settings"));
-
-    const printerPill = document.getElementById("printer-pill");
-    if (printerPill) printerPill.addEventListener("click", ()=>{
-      this.nav("settings");
-      setTimeout(()=>{
-        const d = document.getElementById("s-diag");
-        if (d) d.scrollIntoView({ behavior:"smooth", block:"center" });
-      }, 80);
-    });
   },
 
   start(){
     document.getElementById("login").style.display = "none";
     document.getElementById("app").classList.add("on");
-    const initials = String(this.user.full_name || this.user.username)
+    const initials = (this.user.full_name || this.user.username)
       .split(/\s+/).slice(0,2).map(x=>x[0].toUpperCase()).join("") || "US";
     document.getElementById("user-avatar").textContent = initials;
     document.getElementById("user-who").textContent =
@@ -3531,34 +3704,6 @@ const App = {
       this._pagesInited = true;
     }
     this.nav("pos");
-    this.refreshPills();
-  },
-
-  /* called by Sync whenever remote data changes */
-  onData(){
-    if (this._dataTimer) return;
-    this._dataTimer = setTimeout(()=>{
-      this._dataTimer = null;
-      this.refreshUI();
-    }, 180);
-  },
-
-  refreshUI(){
-    if (!this._pagesInited) return;
-    try{
-      if (this.page === "pos"){
-        POSPage.refreshCategories();
-        POSPage.renderProducts();
-        POSPage.renderTabs();
-        POSPage.recalc();
-      }
-      else if (this.page === "products")  ProductsPage.render();
-      else if (this.page === "customers") CustomersPage.render();
-      else if (this.page === "expenses")  ExpensesPage.render();
-      else if (this.page === "reports")   ReportsPage.render();
-      else if (this.page === "settings")  SettingsPage.renderUsers();
-    }catch(e){ console.error("refreshUI error:", e); }
-    this.applyTheme(DB.settings.theme || "light");
   },
 
   nav(page){
@@ -3585,7 +3730,30 @@ const App = {
     }catch(e){ console.error("nav render error:", e); }
 
     POSPage.updateCartFab();
-    this.refreshPills();
+  },
+
+  /* ── called whenever a remote change lands ── */
+  scheduleSyncRefresh(){
+    if (this._syncTimer) return;
+    this._syncTimer = setTimeout(()=>{
+      this._syncTimer = null;
+      this.refreshAfterSync();
+    }, 250);
+  },
+
+  refreshAfterSync(){
+    if (!this._pagesInited) return;
+    try{
+      if (this.page === "pos"){
+        POSPage.refreshCategories();
+        POSPage.renderProducts();
+        POSPage.renderTabs();
+      } else if (this.page === "products")  ProductsPage.render();
+      else if (this.page === "customers")   CustomersPage.render();
+      else if (this.page === "expenses")    ExpensesPage.render();
+      else if (this.page === "reports")     ReportsPage.render();
+      else if (this.page === "settings")    SettingsPage.renderUsers();
+    }catch(e){ console.warn("refreshAfterSync:", e); }
   },
 
   applyTheme(theme){
@@ -3593,48 +3761,6 @@ const App = {
     if (DB.settings) DB.settings.theme = theme;
     const mt = document.querySelector('meta[name="theme-color"]');
     if (mt) mt.setAttribute("content", theme === "dark" ? "#0a0f1c" : "#0f172a");
-  },
-
-  refreshPills(){
-    /* ---- sync pill ---- */
-    const pill = document.getElementById("sync-pill");
-    const txt  = document.getElementById("sync-pill-txt");
-    if (pill && txt){
-      pill.classList.remove("ok","bad","warn");
-      let cls = "warn", label = "Local";
-      if (Sync.state === "connecting"){ cls = "warn"; label = "Connecting…"; }
-      else if (Sync.mode === "cloud" && Sync.state === "online"){ cls = "ok"; label = "Cloud ✓"; }
-      else if (Sync.mode === "cloud"){ cls = "warn"; label = "Cloud"; }
-      else if (Sync.state === "error"){ cls = "bad"; label = "Offline"; }
-      pill.classList.add(cls);
-      txt.textContent = label;
-      pill.title = Sync.error
-        ? Sync.error
-        : (Sync.mode === "cloud"
-            ? "Cloud sync active — this device shares data with all others"
-            : "Local only — enable Cloud Sync in Settings");
-    }
-    /* ---- printer pill ---- */
-    const ppill = document.getElementById("printer-pill");
-    const ptxt  = document.getElementById("printer-pill-txt");
-    if (ppill && ptxt){
-      const S = DB.settings;
-      const mode = (S.printer_mode || "browser").toLowerCase();
-      ppill.classList.remove("ok","bad","warn");
-      if (mode === "usb"){
-        if (!USBPrinter.isSupported()){ ppill.classList.add("bad"); ptxt.textContent = "USB n/a"; }
-        else if (USBPrinter.isConnected()){ ppill.classList.add("ok"); ptxt.textContent = "USB ready"; }
-        else { ppill.classList.add("warn"); ptxt.textContent = "USB off"; }
-      } else if (mode === "agent"){
-        ppill.classList.add(S.printer_agent_url ? "ok" : "warn");
-        ptxt.textContent = S.printer_agent_url ? "Agent" : "Agent ?";
-      } else if (mode === "cloud"){
-        ppill.classList.add(Sync.isCloud() ? "ok" : "bad");
-        ptxt.textContent = Sync.isCloud() ? "Cloud" : "Cloud off";
-      } else {
-        ptxt.textContent = "Browser";
-      }
-    }
   },
 };
 
@@ -3650,6 +3776,12 @@ window.addEventListener("DOMContentLoaded", ()=>{
     console.error("Init failed:", err);
     const el = document.getElementById("login-err");
     if (el) el.textContent = "Startup error: " + (err.message || err);
+    /* Never leave the operator locked out — fall back to local data. */
+    try{
+      if (!App._pagesInited){
+        App.bindLogin(); App.bindMisc();
+      }
+    }catch(e){}
   });
 });
 </script>
