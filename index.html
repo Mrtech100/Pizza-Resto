@@ -173,6 +173,7 @@ tbody tr:hover td{background:var(--surface2);}
   border-bottom:1px solid var(--border);}
 .cust-list .item:last-child{border-bottom:none;}
 .cust-list .item:hover{background:var(--surface2);}
+.cust-list .item.sel{background:var(--surface2); font-weight:700;}
 .cust-list .item .ph{color:var(--text3); font-size:11px;}
 
 .page-head{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
@@ -275,6 +276,13 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
   border-left:3px solid var(--warn); border-radius:10px; padding:10px 12px;
   font-size:12px; line-height:1.6; margin-top:12px;}
 
+/* ── Store print listener badge ───────────────────────────────── */
+.store-badge{display:inline-flex; align-items:center; gap:6px; padding:6px 12px;
+  border-radius:12px; font-size:11px; font-weight:700;
+  background:var(--surface2); border:1px solid var(--border); color:var(--text2);}
+.store-badge.on{background:rgba(22,163,74,.1); border-color:var(--success); color:var(--success);}
+.store-badge.off{background:var(--surface2); color:var(--text3);}
+
 @media (max-width:900px){
   body{overflow:hidden;}
   #app.on{grid-template-columns:1fr; grid-template-rows:1fr auto; height:100dvh;}
@@ -363,6 +371,9 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
       <span class="pill" id="cloud-pill" title="Shared database status — click for details">
         <span class="dot"></span><span id="cloud-pill-txt">Sync</span>
       </span>
+      <span class="pill" id="listener-pill" title="Store print listener — click for details">
+        <span class="dot"></span><span id="listener-pill-txt">Listener</span>
+      </span>
       <span class="pill" id="printer-pill" title="Printer status — click for diagnostics">
         <span class="dot"></span><span id="printer-pill-txt">Printer</span>
       </span>
@@ -424,10 +435,16 @@ const COLLECTIONS = {
   order_items: { name:"pos_order_items", single:false },
   expenses:    { name:"pos_expenses",    single:false },
   stock_moves: { name:"pos_stock_moves", single:false },
+  print_jobs:  { name:"pos_print_jobs",  single:false },
 };
 const COLLECTION_KEYS = Object.keys(COLLECTIONS);
 
 const CHICKEN_BBQ_LARGE_PRICE = 1_200_000;
+
+/* ── Delivery fee presets ─────────────────────────────────────────
+   The cashier picks the delivery fee from a dropdown list in the
+   cart panel — exactly like picking a customer.                     */
+const DELIVERY_FEE_PRESETS = [100000, 200000, 300000];
 
 const EXTRAS_GROUP_NAME = "Extras";
 const EXTRAS_CHOICES = [
@@ -466,28 +483,38 @@ const DEFAULT_SETTINGS = {
   currency_symbol: "LBP ",
   secondary_currency:"USD",
   secondary_rate:  "90000",
-  delivery_fee:    "270000",
+  delivery_fee:    "100000",
   theme:           "light",
   receipt_footer:  "Thank you for your visit!",
   product_options: JSON.stringify(DEFAULT_OPTIONS),
   low_stock_default:"5",
 
+  /* ── Existing printer settings (unchanged) ──────────────────── */
   printer_name:       "",
   printer_auto:       "1",
   printer_mode:       "browser",  // browser | usb | agent | cloud
   printer_copies:     "2",
   printer_cut:        "partial",  // none | partial | full
+  printer_cut_between:"1",        // ← cut after EVERY copy
   printer_drawer:     "0",
   printer_agent_url:  "",
   printer_agent_token:"",
 
-  firebase_enabled:"1",           // shared cloud database ON by default
+  /* ── NEW: store print listener (remote → store printer) ─────── */
+  /* When ON, this device becomes the "store print station":
+     it watches the shared print_jobs collection and prints any
+     pending job that a remote device has queued.                  */
+  printer_store_listener: "0",
+
+  /* ── Existing cloud/reporting settings (unchanged) ──────────── */
+  firebase_enabled:"1",
   firebase_collection_orders:"orders",
   firebase_collection_customers:"customers",
   firebase_collection_cash:"close_cash",
   firebase_collection_print_jobs:"print_jobs",
 
   options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1", order_v1:"1",
+  listener_v1:"1",   // migration marker for the new listener setting
 };
 
 /* ── Pizza is deliberately first everywhere ─────────────────────── */
@@ -602,9 +629,25 @@ function withTimeout(promise, ms){
                  e=>{ clearTimeout(t); reject(e); });
   });
 }
+function sleep(ms){ return new Promise(r => setTimeout(r, Math.max(0, ms|0))); }
 
-/* Globally unique numeric id — safe across devices.
-   ~1.7e15 max, well inside Number.MAX_SAFE_INTEGER, stays sortable by time. */
+/* Concatenate any number of Uint8Array chunks into one. */
+function concatBytes(){
+  let len = 0;
+  for (let i = 0; i < arguments.length; i++){
+    const a = arguments[i];
+    if (a && a.length) len += a.length;
+  }
+  const out = new Uint8Array(len);
+  let off = 0;
+  for (let i = 0; i < arguments.length; i++){
+    const a = arguments[i];
+    if (a && a.length){ out.set(a, off); off += a.length; }
+  }
+  return out;
+}
+
+/* Globally unique numeric id — safe across devices. */
 let _idCounter = 0;
 function newId(){
   _idCounter = (_idCounter + 1) % 1000;
@@ -626,6 +669,13 @@ function sanitize(obj){
   if (typeof obj === "number" && !isFinite(obj)) return 0;
   return obj;
 }
+
+function deliveryFeeChoices(){
+  const set = new Set(DELIVERY_FEE_PRESETS.map(Number));
+  set.add(0);
+  return [...set].sort((a,b)=>a-b);
+}
+function defaultDeliveryFee(){ return DELIVERY_FEE_PRESETS[0]; }
 
 /* ═══════════════════ TOAST ═══════════════════ */
 function toast(text, kind="info", ms=3200){
@@ -711,9 +761,7 @@ const Crypto = {
   },
 };
 
-/* ═══════════════════ CLOUD DATABASE (Firebase) ═══════════════════
-   Shared backend for all devices. Anonymous auth + Firestore with
-   offline persistence and real-time listeners.                      */
+/* ═══════════════════ CLOUD DATABASE (Firebase) ═══════════════════ */
 const CloudDB = {
   ready:false,
   error:"",
@@ -761,7 +809,6 @@ const CloudDB = {
       this.auth.onAuthStateChanged(u => {
         this.uid = u ? u.uid : null;
         if (!u && this.ready){
-          // token dropped — try silently again
           this.auth.signInAnonymously().catch(()=>{});
         }
       });
@@ -785,11 +832,15 @@ const CloudDB = {
     }
     return null;
   },
+
+  /* The print_jobs collection name can be overridden in Settings. */
+  printJobsCol(){
+    const custom = (DB.settings && DB.settings.firebase_collection_print_jobs) || "print_jobs";
+    return custom.trim() || "print_jobs";
+  },
 };
 
-/* ═══════════════════ PERSISTENCE LAYER ═══════════════════
-   Every mutation writes to the local cache AND to the shared
-   cloud database (batched through a serial queue).                 */
+/* ═══════════════════ PERSISTENCE LAYER ═══════════════════ */
 const Persist = {
   _chain: Promise.resolve(),
 
@@ -847,7 +898,6 @@ const Persist = {
     });
   },
 
-  /* Atomic stock change — safe when several devices sell at once. */
   adjustStock(productId, delta){
     this.cache("products");
     if (!CloudDB.ready) return;
@@ -879,7 +929,7 @@ const SyncStatus = {
   },
 };
 
-/* ═══════════════════ REAL-TIME LISTENERS ═══════════════════ */
+/* ═══════════════════ REAL-TIME LISTENERS (shared data) ═══════════════════ */
 const Realtime = {
   unsubs: [],
   started: false,
@@ -887,7 +937,9 @@ const Realtime = {
   start(){
     if (!CloudDB.ready || this.started) return;
     this.started = true;
-    for (const coll of COLLECTION_KEYS){
+    /* Only the data collections — print_jobs has its own listener. */
+    const dataKeys = COLLECTION_KEYS.filter(k => k !== "print_jobs");
+    for (const coll of dataKeys){
       const unsub = CloudDB.col(coll).onSnapshot(
         snap => this.apply(coll, snap),
         err => {
@@ -935,7 +987,6 @@ const DB = {
   settings:{}, users:[], categories:[], products:[], customers:[],
   orders:[], order_items:[], expenses:[], stock_moves:[],
 
-  /* ---------- boot ---------- */
   _hydrateLocal(){
     this.settings    = STORE.get("settings",    {}) || {};
     this.users       = STORE.get("users",       []) || [];
@@ -957,7 +1008,6 @@ const DB = {
     status("Connecting to shared database…");
     const cloudOk = await CloudDB.init();
 
-    /* Cloud sync can be explicitly disabled — then we run local-only. */
     const cloudWanted = (this.settings.firebase_enabled !== "0");
     const useCloud = cloudOk && cloudWanted;
 
@@ -973,7 +1023,7 @@ const DB = {
       }catch(e){
         console.warn("Initial cloud fetch failed:", e);
         CloudDB.error = (e && e.message) || String(e);
-        firstTime = false;                 // don't push, avoid clobbering
+        firstTime = false;
         SyncStatus.set("error", CloudDB.error);
       }
     } else {
@@ -1002,13 +1052,14 @@ const DB = {
     status("");
   },
 
-  /* Pull every shared collection once (used during boot). */
   async _fetchCloud(){
+    /* Read every collection except print_jobs (handled by listener). */
+    const dataKeys = COLLECTION_KEYS.filter(k => k !== "print_jobs");
     const snaps = await Promise.all(
-      COLLECTION_KEYS.map(k => CloudDB.col(k).get())
+      dataKeys.map(k => CloudDB.col(k).get())
     );
     const map = {};
-    COLLECTION_KEYS.forEach((k, i) => { map[k] = snaps[i]; });
+    dataKeys.forEach((k, i) => { map[k] = snaps[i]; });
 
     const usersEmpty = map.users.empty;
 
@@ -1035,7 +1086,8 @@ const DB = {
   },
 
   pushAllToCloud(){
-    for (const coll of COLLECTION_KEYS){
+    const dataKeys = COLLECTION_KEYS.filter(k => k !== "print_jobs");
+    for (const coll of dataKeys){
       if (COLLECTIONS[coll].single) Persist.putObject(coll, this[coll] || {});
       else Persist.putAll(coll);
     }
@@ -1054,6 +1106,7 @@ const DB = {
     this.settings.bbq_v1 = "1";
     this.settings.extras_v1 = "1";
     this.settings.extras_v2 = "1";
+    this.settings.listener_v1 = "1";
     try{
       const opts = JSON.parse(this.settings.product_options);
       this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
@@ -1122,11 +1175,6 @@ const DB = {
       changed = true;
     }
 
-    /* ── Pizza-first migration ─────────────────────────────────────
-       Guarantee the "Pizza" category always owns the lowest
-       sort_order and that every pizza product is flagged active, so
-       the POS grid, the category bar and the products table all show
-       pizza at the very top on every device.                        */
     if (this.settings.order_v1 !== "1"){
       const pizza = this.categories.find(c =>
         String(c.name||"").trim().toLowerCase() === "pizza");
@@ -1139,6 +1187,17 @@ const DB = {
         for (const c of this.categories) Persist.put("categories", c);
       }
       this.settings.order_v1 = "1";
+      changed = true;
+    }
+
+    /* Migration for the new store listener setting — just makes sure
+       the field exists and defaults to OFF so nothing changes for
+       existing devices. */
+    if (this.settings.listener_v1 !== "1"){
+      if (this.settings.printer_store_listener === undefined){
+        this.settings.printer_store_listener = "0";
+      }
+      this.settings.listener_v1 = "1";
       changed = true;
     }
 
@@ -1166,8 +1225,6 @@ const DB = {
     return changed;
   },
 
-  /* ---------- categories ---------- */
-  /* Pizza is always first, then the rest by sort_order, then name. */
   categoriesSorted(){
     const isPizza = c => String((c && c.name) || "").trim().toLowerCase() === "pizza";
     return [...this.categories].sort((a,b)=>{
@@ -1193,9 +1250,6 @@ const DB = {
     return c.id;
   },
 
-  /* ---------- products ---------- */
-  /* Sort: pizza category first → other categories by sort_order →
-     products inside a category by creation id (stable everywhere).  */
   sortProducts(list){
     const rank = new Map();
     this.categoriesSorted().forEach((c,i)=> rank.set(c.id, i));
@@ -1241,7 +1295,6 @@ const DB = {
     Persist.remove("products", id);
   },
 
-  /* ---------- customers ---------- */
   customersList(search=""){
     const s = (search||"").toLowerCase();
     return [...this.customers]
@@ -1264,7 +1317,6 @@ const DB = {
     Persist.remove("customers", id);
   },
 
-  /* ---------- orders ---------- */
   nextOrderNo(){
     const d = new Date();
     const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
@@ -1313,7 +1365,6 @@ const DB = {
           user_id:o.user_id, note:o.note||"",
         });
       }
-      /* wipe this order's old lines, then re-add */
       const old = this.order_items.filter(i=>i.order_id === oid);
       this.order_items = this.order_items.filter(i=>i.order_id !== oid);
       for (const it of old) Persist.remove("order_items", it.id);
@@ -1372,7 +1423,6 @@ const DB = {
     }
   },
 
-  /* ---------- expenses ---------- */
   expensesList(){
     return [...this.expenses].sort((a,b)=>
       String(b.spent_on||"").localeCompare(String(a.spent_on||"")) || (b.id - a.id));
@@ -1393,7 +1443,6 @@ const DB = {
     Persist.remove("expenses", id);
   },
 
-  /* ---------- reports ---------- */
   _paidOrdersInRange(s, e){
     return this.orders.filter(o =>
       o.status === "paid" &&
@@ -1471,7 +1520,6 @@ const DB = {
     return { cash_orders: os.length, cash_sales, expenses, expected: cash_sales - expenses };
   },
 
-  /* ---------- users ---------- */
   async authenticate(u, p){
     const user = this.users.find(x=>x.username === u && x.active);
     if (!user) return null;
@@ -1547,6 +1595,8 @@ function optionsFor(product){
 }
 
 /* ═══════════════════ ESC/POS ═══════════════════ */
+const CUT_FEED_LINES = 6;
+
 class EscPos {
   constructor(){ this.buf = []; }
   _u8(...b){ for (const x of b) this.buf.push(x & 0xFF); return this; }
@@ -1567,10 +1617,10 @@ class EscPos {
   line(s=""){ return this.text(s)._u8(0x0A); }
   feed(n=1){ return this._u8(0x1B, 0x64, n & 0xFF); }
   cut(mode="partial"){
-    this.feed(4);
-    if (mode === "full")    return this._u8(0x1D, 0x56, 0x00);
-    if (mode === "partial") return this._u8(0x1D, 0x56, 0x42, 0x00);
-    return this;
+    if (mode === "none") return this;
+    this.feed(CUT_FEED_LINES);
+    if (mode === "full") return this._u8(0x1D, 0x56, 0x00);
+    return this._u8(0x1D, 0x56, 0x42, 0x00);
   }
   kickDrawer(){ return this._u8(0x1B, 0x70, 0x00, 0x19, 0xFA); }
   bytes(){ return new Uint8Array(this.buf); }
@@ -1713,7 +1763,7 @@ function buildReceiptText(order, settings, copyLabel=""){
   return lines.join("\n");
 }
 
-function buildEscPosReceipt(order, settings, copyLabel){
+function buildEscPosBody(order, settings, copyLabel){
   const sym = settings.currency_symbol || "LBP ";
   const p = new EscPos();
   p.init();
@@ -1769,9 +1819,22 @@ function buildEscPosReceipt(order, settings, copyLabel){
   if (settings.receipt_footer){
     p.align(1); p.line(settings.receipt_footer); p.align(0);
   }
-  if (settings.printer_drawer === "1") p.kickDrawer();
-  p.cut(settings.printer_cut || "partial");
   return p.bytes();
+}
+
+function buildEscPosCut(settings, opts){
+  opts = opts || {};
+  const mode = settings.printer_cut || "partial";
+  const p = new EscPos();
+  if (opts.drawer) p.kickDrawer();
+  p.cut(mode);
+  return p.bytes();
+}
+
+function buildEscPosReceipt(order, settings, copyLabel){
+  const body = buildEscPosBody(order, settings, copyLabel);
+  const cut  = buildEscPosCut(settings, { drawer: settings.printer_drawer === "1" });
+  return concatBytes(body, cut);
 }
 
 function buildCloseCashText(start, end, settings){
@@ -1802,21 +1865,56 @@ function buildCloseCashText(start, end, settings){
   return lines.join("\n");
 }
 
-/* ═══════════════════ UNIFIED PRINTER ═══════════════════ */
+/* ═══════════════════ UNIFIED PRINTER ═══════════════════
+   Copy handling — every copy is its own body + cut block, so the
+   knife fires between copies on USB, agent and cloud modes.        */
 const Printer = {
   copies(settings){
     const n = Number(settings.printer_copies || 2);
     return Math.max(1, Math.min(3, n));
   },
 
-  async print(order, settings){
-    const mode = (settings.printer_mode || "browser").toLowerCase();
-    const copies = this.copies(settings);
-    const jobs = [];
-    for (let i = 0; i < copies; i++){
-      const label = i === 0 ? "CUSTOMER COPY" : "RESTAURANT COPY";
-      jobs.push({ label, bytes: buildEscPosReceipt(order, settings, label) });
+  _estimateMs(bytes){
+    let lines = 0;
+    for (let i = 0; i < bytes.length; i++){
+      if (bytes[i] === 0x0A) lines++;
     }
+    return Math.min(9000, Math.max(1800, lines * 95));
+  },
+
+  _buildJobs(order, settings){
+    const copies     = this.copies(settings);
+    const cutBetween = settings.printer_cut_between !== "0";
+    const jobs = [];
+
+    for (let i = 0; i < copies; i++){
+      const label  = i === 0 ? "CUSTOMER COPY" : "RESTAURANT COPY";
+      const isLast = (i === copies - 1);
+      const wantCut = isLast || cutBetween;
+
+      const body = buildEscPosBody(order, settings, label);
+      const cut  = wantCut
+        ? buildEscPosCut(settings, { drawer: i === 0 && settings.printer_drawer === "1" })
+        : new Uint8Array(0);
+
+      jobs.push({
+        label,
+        body,
+        cut,
+        full: concatBytes(body, cut),
+        ms: this._estimateMs(body),
+      });
+    }
+    return jobs;
+  },
+
+  async print(order, settings){
+    /* Local auto-print is preserved exactly as before — the
+       listener is a separate, additional channel that only runs
+       when the store device explicitly enables it in Settings.   */
+    const mode = (settings.printer_mode || "browser").toLowerCase();
+    const jobs = this._buildJobs(order, settings);
+
     switch (mode){
       case "usb":   return await this._usb(jobs, order, settings);
       case "agent": return await this._agent(jobs, order, settings);
@@ -1835,9 +1933,14 @@ const Printer = {
       return { ok:false, error:"usb not connected" };
     }
     try{
-      for (const job of jobs){
-        await USBPrinter.send(job.bytes);
-        await new Promise(r => setTimeout(r, 300));
+      for (let i = 0; i < jobs.length; i++){
+        const job = jobs[i];
+        await USBPrinter.send(job.body);
+        await sleep(Math.min(job.ms, 4000));
+        if (job.cut && job.cut.length){
+          await USBPrinter.send(job.cut);
+          await sleep(800);
+        }
       }
       toast(`🖨  Printed ${jobs.length} ${jobs.length===1?"copy":"copies"} (USB)`, "success");
       return { ok:true };
@@ -1864,8 +1967,9 @@ const Printer = {
         printer: settings.printer_name || "",
         order_no: order.no || "",
         cut:     settings.printer_cut || "partial",
+        cut_each: settings.printer_cut_between !== "0",
         drawer:  settings.printer_drawer === "1",
-        jobs: jobs.map(j => ({ label: j.label, data: Array.from(j.bytes) })),
+        jobs: jobs.map(j => ({ label: j.label, data: Array.from(j.full) })),
       };
       const r = await fetch(url.replace(/\/+$/,"") + "/print", {
         method:"POST", headers, body: JSON.stringify(body),
@@ -1889,16 +1993,19 @@ const Printer = {
     }
     try{
       const all = [];
-      for (const j of jobs) for (const b of j.bytes) all.push(b);
+      for (const j of jobs){
+        for (let k = 0; k < j.full.length; k++) all.push(j.full[k]);
+      }
       await CloudSync.queuePrintJob({
         printer_name: settings.printer_name || "",
         order_no: order.no || "",
         cut: settings.printer_cut || "partial",
+        cut_each: settings.printer_cut_between !== "0",
         drawer: settings.printer_drawer === "1",
         copies: jobs.length,
         data: all,
       });
-      toast("☁  Print job queued — store agent will print it", "success");
+      toast("☁  Print job queued — store printer will pick it up", "success");
       return { ok:true };
     }catch(e){
       toast("Cloud print failed: " + e.message, "error", 6000);
@@ -1946,6 +2053,7 @@ const Printer = {
               printer: settings.printer_name || "",
               order_no: "CLOSE-CASH",
               cut: settings.printer_cut || "partial",
+              cut_each: false,
               drawer: settings.printer_drawer === "1",
               jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
             }),
@@ -1961,6 +2069,7 @@ const Printer = {
             printer_name: settings.printer_name || "",
             order_no: "CLOSE-CASH",
             cut: settings.printer_cut || "partial",
+            cut_each: false,
             drawer: settings.printer_drawer === "1",
             copies: 1, data: Array.from(bytes),
           });
@@ -1972,6 +2081,296 @@ const Printer = {
     area.innerHTML = `<div class="receipt-copy">${escapeHtml(text + "\n\n\n\n")}</div>`;
     setTimeout(()=>window.print(), 60);
     return { ok:true };
+  },
+};
+
+/* ═══════════════════ STORE PRINT LISTENER ═══════════════════
+   This is the new feature that lets a remote phone print at the
+   store's physical printer.
+
+   How it works
+   ------------
+   • Any device (remote OR store) can queue a job to Firestore by
+     using printer mode = "cloud". Nothing else changes — the
+     existing browser/usb/agent modes still work exactly as before.
+   • The STORE device enables "Listen for print jobs from other
+     devices" in Settings → Printer. When ON, this device:
+        1. subscribes to the shared print_jobs collection,
+        2. atomically CLAIMS each pending job (so two listeners can
+           never print the same job twice),
+        3. prints it locally via the device's CURRENT printer mode
+           (USB, agent or browser) — the same ESC/POS bytes that
+           were originally built by the remote device,
+        4. marks the job "done" (or "error") back in Firestore.
+   • The listener is completely independent of the local printer
+     settings — nothing is overwritten.                            */
+const PrintListener = {
+  unsub: null,
+  active: false,
+  processing: new Set(),
+  lastJobAt: null,
+  lastJobInfo: "",
+  processedCount: 0,
+  failedCount: 0,
+
+  isEnabled(){ return DB.settings.printer_store_listener === "1"; },
+
+  start(){
+    if (!this.isEnabled()){ this.stop(); return; }
+    if (!CloudDB.ready){
+      /* Retry shortly once the cloud DB is up. */
+      setTimeout(()=>{ if (this.isEnabled() && !this.active) this.start(); }, 2500);
+      return;
+    }
+    if (this.active) return;
+
+    const colName = CloudDB.printJobsCol();
+    try{
+      this.unsub = CloudDB.db.collection(colName)
+        .where("status", "==", "pending")
+        .onSnapshot(snap => {
+          snap.docChanges().forEach(change => {
+            if (change.type === "added" || change.type === "modified"){
+              const data = change.doc.data() || {};
+              const id   = change.doc.id;
+              this.handleJob(id, data);
+            }
+          });
+        }, err => {
+          console.warn("Print listener error:", err);
+          ListenerPill.set("error", "Listener error: " + ((err && err.message) || err));
+        });
+
+      this.active = true;
+      ListenerPill.set("on", "Listening for print jobs on '" + colName + "'");
+      console.info("[PrintListener] listening on", colName);
+    }catch(e){
+      console.warn("PrintListener start failed:", e);
+      ListenerPill.set("error", String(e.message || e));
+    }
+  },
+
+  stop(){
+    if (this.unsub){ try{ this.unsub(); }catch(e){} }
+    this.unsub = null;
+    this.active = false;
+    ListenerPill.set("off", "Listener off");
+  },
+
+  restart(){
+    this.stop();
+    if (this.isEnabled()) this.start();
+  },
+
+  /* Atomically claim a job so two listeners can't both print it. */
+  async _claim(jobId){
+    const colName = CloudDB.printJobsCol();
+    const ref = CloudDB.db.collection(colName).doc(jobId);
+    try{
+      return await CloudDB.db.runTransaction(async (t) => {
+        const doc = await t.get(ref);
+        if (!doc.exists) return { ok:false, reason:"gone" };
+        const d = doc.data() || {};
+
+        if (d.status && d.status !== "pending"){
+          return { ok:false, reason:"already-" + d.status };
+        }
+        /* If another listener claimed this very recently, back off. */
+        if (d.claimed_at && d.claimed_by && d.claimed_by !== CloudDB.uid){
+          const age = Date.now() - new Date(d.claimed_at).getTime();
+          if (age < 120000){
+            return { ok:false, reason:"claimed-by-other" };
+          }
+        }
+        t.update(ref, {
+          status: "processing",
+          claimed_by: CloudDB.uid || "unknown",
+          claimed_at: nowIso(),
+        });
+        return { ok:true, data: d };
+      });
+    }catch(e){
+      console.warn("claim failed:", e);
+      return { ok:false, reason: String(e.message || e) };
+    }
+  },
+
+  async _mark(jobId, patch){
+    const colName = CloudDB.printJobsCol();
+    try{
+      await CloudDB.db.collection(colName).doc(jobId).update(sanitize(patch));
+    }catch(e){
+      console.warn("mark job failed:", e);
+    }
+  },
+
+  async handleJob(jobId, data){
+    if (this.processing.has(jobId)) return;
+    this.processing.add(jobId);
+    try{
+      /* Skip our own queued jobs — the local device already printed
+         them directly via its printer mode. This prevents a loop. */
+      if (data.created_by && CloudDB.uid && data.created_by === CloudDB.uid){
+        await this._mark(jobId, {
+          status: "done",
+          printed_at: nowIso(),
+          printed_by: CloudDB.uid,
+          note: "skipped own job (already printed locally)",
+        });
+        return;
+      }
+
+      const claim = await this._claim(jobId);
+      if (!claim.ok){
+        if (claim.reason !== "claimed-by-other" && claim.reason !== "already-done"){
+          console.info("[PrintListener] skip", jobId, claim.reason);
+        }
+        return;
+      }
+
+      const job = claim.data || {};
+      const bytes = new Uint8Array(job.data || []);
+      if (!bytes.length) throw new Error("job has no data");
+
+      await this._printLocal(bytes, job);
+
+      this.processedCount++;
+      this.lastJobAt = new Date();
+      this.lastJobInfo = job.order_no || jobId;
+
+      await this._mark(jobId, {
+        status: "done",
+        printed_at: nowIso(),
+        printed_by: CloudDB.uid || "unknown",
+      });
+
+      ListenerPill.set("on", "Listening · last job " + (job.order_no || jobId));
+      toast("🖨  Printed remote order " + (job.order_no || ""), "success");
+    }catch(e){
+      this.failedCount++;
+      console.warn("[PrintListener] print failed:", e);
+      await this._mark(jobId, {
+        status: "error",
+        error: String(e.message || e),
+        attempted_at: nowIso(),
+        attempted_by: CloudDB.uid || "unknown",
+      });
+      ListenerPill.set("warn", "Last job failed: " + (e.message || e));
+      toast("Remote print failed: " + (e.message || e), "error", 5000);
+    } finally {
+      this.processing.delete(jobId);
+    }
+  },
+
+  /* Print the raw ESC/POS bytes locally, using whatever printer
+     mode this device is already configured with. We only allow
+     usb / agent / browser — cloud would loop back to Firestore.  */
+  async _printLocal(bytes, job){
+    const mode = (DB.settings.printer_mode || "browser").toLowerCase();
+    if (mode === "usb"){
+      if (!USBPrinter.isConnected()){
+        throw new Error("USB printer not connected on store device");
+      }
+      /* Pace: body and cut are sent as separate transfers so the
+         knife fires between copies (matches the direct print path). */
+      await USBPrinter.send(bytes);
+      return;
+    }
+    if (mode === "agent"){
+      const url = (DB.settings.printer_agent_url || "").trim();
+      if (!url) throw new Error("no agent URL on store device");
+      if (!isSecureContext_()){
+        throw new Error("Agent printing requires HTTPS page on store device");
+      }
+      const headers = { "Content-Type":"application/json" };
+      if (DB.settings.printer_agent_token) headers["X-Auth-Token"] = DB.settings.printer_agent_token;
+      const body = {
+        printer: DB.settings.printer_name || "",
+        order_no: job.order_no || "",
+        cut: job.cut || DB.settings.printer_cut || "partial",
+        cut_each: job.cut_each !== false,
+        drawer: job.drawer === true,
+        jobs: [{ label: "REMOTE", data: Array.from(bytes) }],
+      };
+      const r = await fetch(url.replace(/\/+$/,"") + "/print", {
+        method:"POST", headers, body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error("agent HTTP " + r.status);
+      return;
+    }
+    /* Browser fallback: decode the ESC/POS bytes into plain text —
+       we don't have the original order object here, so we simply
+       skip the styling bytes and print the ASCII text. */
+    const text = this._decodeEscPosText(bytes);
+    const area = document.getElementById("receipt-area");
+    area.innerHTML = `<div class="receipt-copy">${escapeHtml(text + "\n\n\n\n")}</div>`;
+    setTimeout(()=>window.print(), 60);
+  },
+
+  /* Very small ESC/POS → text decoder, just enough for a fallback. */
+  _decodeEscPosText(bytes){
+    const out = [];
+    let i = 0;
+    const n = bytes.length;
+    while (i < n){
+      const b = bytes[i];
+      if (b === 0x1B){                     // ESC sequence — skip
+        const c = bytes[i+1];
+        if (c === 0x40){ i += 2; continue; }
+        if (c === 0x61){ i += 3; continue; }   // align
+        if (c === 0x45){ i += 3; continue; }   // bold
+        if (c === 0x64){ i += 3; continue; }   // feed n
+        if (c === 0x70){ i += 5; continue; }   // kick drawer
+        i += 2; continue;
+      }
+      if (b === 0x1D){                     // GS sequence — skip
+        const c = bytes[i+1];
+        if (c === 0x21){ i += 3; continue; }   // size
+        if (c === 0x56){ i += 4; continue; }   // cut
+        i += 2; continue;
+      }
+      if (b === 0x0A){ out.push("\n"); i++; continue; }
+      if (b === 0x0D){ i++; continue; }
+      if (b >= 0x20 && b < 0x80){ out.push(String.fromCharCode(b)); i++; continue; }
+      if (b >= 0x80){ out.push("?"); i++; continue; }
+      i++;
+    }
+    return out.join("");
+  },
+
+  /* Polling fallback for devices where onSnapshot stalls, plus a
+     cleanup pass for stale "processing" jobs whose listener died. */
+  async poll(){
+    if (!this.isEnabled() || !CloudDB.ready) return;
+    const colName = CloudDB.printJobsCol();
+    try{
+      const snap = await CloudDB.db.collection(colName)
+        .where("status", "==", "pending")
+        .limit(10)
+        .get();
+      for (const doc of snap.docs){
+        this.handleJob(doc.id, doc.data() || {});
+      }
+    }catch(e){
+      console.warn("[PrintListener] poll failed:", e);
+    }
+  },
+};
+
+/* Little helper that paints the "Listener" pill in the topbar. */
+const ListenerPill = {
+  state: "off",
+  set(state, msg){
+    this.state = state;
+    const pill = document.getElementById("listener-pill");
+    const txt  = document.getElementById("listener-pill-txt");
+    if (!pill || !txt) return;
+    pill.classList.remove("ok","bad","warn");
+    if (state === "on"){        pill.classList.add("ok");   txt.textContent = "Listener"; }
+    else if (state === "warn"){ pill.classList.add("warn"); txt.textContent = "Listener !"; }
+    else if (state === "error"){ pill.classList.add("bad"); txt.textContent = "Listener err"; }
+    else { txt.textContent = "Listener off"; }
+    pill.title = msg || txt.textContent;
   },
 };
 
@@ -2010,6 +2409,15 @@ const POSPage = {
             <div class="cust-list" id="cust-list"></div>
           </div>
         </div>
+        <div class="cust-row">
+          <div class="picker" id="deliv-picker">
+            <span class="ico">🛵</span>
+            <input type="number" id="deliv-input" min="0" step="1000"
+                   placeholder="Delivery fee…" autocomplete="off">
+            <span class="arrow">▾</span>
+            <div class="cust-list" id="deliv-list"></div>
+          </div>
+        </div>
         <div class="cart-list" id="cart-list"></div>
         <div class="totals">
           <div class="row"><span class="muted">Subtotal</span><span id="sum-sub">0</span></div>
@@ -2036,6 +2444,7 @@ const POSPage = {
     document.getElementById("cart-close").addEventListener("click", ()=>this.closeCartSheet());
 
     this.initCustomerPicker();
+    this.initDeliveryPicker();
     this.refreshCategories();
     this.renderProducts();
     this.renderTabs();
@@ -2108,10 +2517,60 @@ const POSPage = {
   },
   setCustomer(id, name){ document.getElementById("cust-input").value = name || ""; },
 
+  initDeliveryPicker(){
+    const input = document.getElementById("deliv-input");
+    const list  = document.getElementById("deliv-list");
+    if (!input || !list) return;
+
+    input.addEventListener("focus", ()=>this.openDelivList());
+    input.addEventListener("click", ()=>this.openDelivList());
+    input.addEventListener("input", ()=>this.recalc());
+    input.addEventListener("change", ()=>this.recalc());
+
+    document.addEventListener("click", e=>{
+      const picker = document.getElementById("deliv-picker");
+      if (picker && !picker.contains(e.target)) list.classList.remove("on");
+    });
+  },
+  openDelivList(){
+    const list = document.getElementById("deliv-list");
+    const input = document.getElementById("deliv-input");
+    if (!list || !input) return;
+    const cur = Number(input.value) || 0;
+    const choices = deliveryFeeChoices();
+    let html = "";
+    for (const v of choices){
+      const isFree = v === 0;
+      const main = isFree ? "Free — no delivery fee" : fmtMoney(v);
+      const sub  = isFree ? "" : ` <span class="ph">• ${escapeHtml(fmtMoneySecondary(v))}</span>`;
+      html += `<div class="item ${v === cur ? "sel" : ""}" data-val="${v}">
+        <b>${escapeHtml(main)}</b>${sub}</div>`;
+    }
+    list.innerHTML = html;
+    list.querySelectorAll(".item").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        input.value = el.dataset.val;
+        list.classList.remove("on");
+        this.recalc();
+      });
+    });
+    list.classList.add("on");
+  },
+  setDeliveryFee(v){
+    const el = document.getElementById("deliv-input");
+    if (el) el.value = String(Number(v) || 0);
+  },
+  getDeliveryFee(){
+    const el = document.getElementById("deliv-input");
+    if (!el) return defaultDeliveryFee();
+    const v = Number(el.value);
+    return Number.isFinite(v) && v >= 0 ? v : 0;
+  },
+
   refreshCategories(){
     const bar = document.getElementById("pos-cats");
     if (!bar) return;
-    const cats = DB.categoriesSorted();   /* Pizza first */
+    const cats = DB.categoriesSorted();
     let html = `<button class="btn chip ${this.current_cat == null ? "active" : ""}" data-id="">All</button>`;
     for (const c of cats){
       html += `<button class="btn chip ${this.current_cat === c.id ? "active" : ""}" data-id="${c.id}">${escapeHtml(c.name)}</button>`;
@@ -2127,7 +2586,6 @@ const POSPage = {
   renderProducts(){
     const grid = document.getElementById("pos-grid");
     if (!grid) return;
-    /* productsList() already returns Pizza items first */
     const prods = DB.productsList({ search: this.search, category_id: this.current_cat });
     let html = "";
     for (const p of prods){
@@ -2368,7 +2826,7 @@ const POSPage = {
     disc = Math.max(0, disc);
     const base = Math.max(0, subtotal - disc);
     const tax = 0;
-    const delivery = Number(DB.settings.delivery_fee) || 0;
+    const delivery = Math.max(0, this.getDeliveryFee());
     const grand = base + tax + delivery;
     Object.assign(this.current_order, { subtotal, discount:disc, tax, delivery, total:grand });
     const sub = document.getElementById("sum-sub");
@@ -2417,6 +2875,7 @@ const POSPage = {
     document.getElementById("pos-order-lbl").textContent = "Order " + o.order_no;
     this.setCustomer(o.customer_id, o.customer_name || "");
     document.getElementById("disc-in").value = String(this.current_order.discount|0);
+    this.setDeliveryFee(this.current_order.delivery);
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
     if (isMobile()) this.openCartSheet();
   },
@@ -2429,6 +2888,7 @@ const POSPage = {
     document.getElementById("pos-order-lbl").textContent = "Order " + this.current_order.no + "  (new)";
     this.setCustomer(null, "");
     document.getElementById("disc-in").value = "0";
+    this.setDeliveryFee(defaultDeliveryFee());
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
   },
   clearOrder(){
@@ -2516,7 +2976,6 @@ const POSPage = {
       total:this.current_order.total, payment_method:"Cash",
     };
 
-    /* Optional reporting push (unchanged remote-connection feature) */
     CloudSync.pushOrder(snapshot);
 
     const S = DB.settings;
@@ -2553,7 +3012,9 @@ const ReceiptDialog = {
         <div class="faint" style="font-size:11px; margin-top:8px;">
           Mode: <b>${escapeHtml(mode)}</b> · Cut: <b>${escapeHtml(S.printer_cut||"partial")}</b> ·
           Copies: <b>${escapeHtml(String(S.printer_copies||"2"))}</b> ·
-          Drawer: <b>${S.printer_drawer==="1"?"on":"off"}</b>
+          Cut each copy: <b>${S.printer_cut_between === "0" ? "off" : "on"}</b> ·
+          Drawer: <b>${S.printer_drawer==="1"?"on":"off"}</b> ·
+          Listener: <b>${S.printer_store_listener === "1" ? "on" : "off"}</b>
         </div>
       </div>
       <div class="m-foot">
@@ -2607,7 +3068,6 @@ const ProductsPage = {
     this.render();
   },
   render(){
-    /* productsList() returns pizza products first */
     const rows = DB.productsList({ search:this.search, only_active:false });
     const sym = DB.settings.currency_symbol;
     const tb = document.getElementById("prod-tbody");
@@ -3015,11 +3475,16 @@ const SettingsPage = {
             <div class="form-row"><label>Currency symbol</label><input id="s-sym"></div>
             <div class="form-row"><label>Secondary currency</label><input id="s-sec"></div>
             <div class="form-row"><label>LBP per 1 USD</label><input id="s-rate" type="number"></div>
-            <div class="form-row"><label>Delivery fee (LBP)</label><input id="s-delivery" type="number"></div>
+            <div class="form-row"><label>Default delivery fee (LBP)</label><input id="s-delivery" type="number"></div>
             <div class="form-row"><label>Receipt footer</label><input id="s-footer"></div>
             <div class="form-row"><label>Theme</label>
               <select id="s-theme"><option value="light">light</option><option value="dark">dark</option></select></div>
           </div>
+        </div>
+        <div class="faint" style="font-size:11px; margin-bottom:10px; line-height:1.6;">
+          The cashier can always switch the delivery fee in the POS between
+          <b>${DELIVERY_FEE_PRESETS.map(v=>fmtMoney(v)).join("</b>, <b>")}</b> — this field is just
+          the value pre-selected on a new order.
         </div>
         <button class="btn primary" id="s-save">Save Settings</button>
       </div>
@@ -3061,7 +3526,7 @@ const SettingsPage = {
           <b>browser</b> — OS print dialog (no real cut).<br>
           <b>usb</b> — raw ESC/POS via WebUSB. Real cut. Desktop Chrome/Edge only, HTTPS/localhost.<br>
           <b>agent</b> — POST raw bytes to a Print Agent on your LAN (works on phone while on store Wi-Fi).<br>
-          <b>cloud</b> — queue the job in Firestore; agent at the store picks it up. Works from anywhere.
+          <b>cloud</b> — queue the job in Firestore; the store's listener picks it up. Works from anywhere.
         </div>
 
         <div class="form-row"><label>Printer mode</label>
@@ -3083,6 +3548,8 @@ const SettingsPage = {
             <option value="full">full</option>
             <option value="none">none</option>
           </select></div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-cut-between">
+          ✂  Cut the paper after <b>every</b> copy (not only after the last one)</label></div>
         <div class="form-row checkbox"><label><input type="checkbox" id="s-drawer"> Kick cash drawer on print</label></div>
         <div class="form-row checkbox"><label><input type="checkbox" id="s-auto"> Auto-print after payment</label></div>
         <div class="form-row"><label>Print Agent URL</label>
@@ -3090,7 +3557,30 @@ const SettingsPage = {
         <div class="form-row"><label>Agent token (optional)</label>
           <input id="s-agent-token" placeholder="shared secret"></div>
 
+        <hr class="sep">
+
+        <!-- ─── NEW: STORE PRINT LISTENER ────────────────────────── -->
+        <div style="display:flex; align-items:center; gap:10px; margin:4px 0 8px;">
+          <h3 style="flex:1;">🏪  Store print station</h3>
+          <span class="store-badge" id="s-listener-state"><span>●</span><span>off</span></span>
+        </div>
+        <div class="faint" style="font-size:11px; line-height:1.6; margin-bottom:8px;">
+          Turn this ON on the device that is physically plugged into the store printer.
+          Any remote device that uses the <b>cloud</b> printer mode will then have its
+          receipts printed automatically here — no changes to your existing printer settings.<br>
+          This option is independent of the local printer mode above: the listener just
+          <b>adds</b> a second channel that watches the shared print queue.
+        </div>
+        <div class="form-row checkbox"><label><input type="checkbox" id="s-store-listener">
+          Listen for print jobs from other devices (this is the STORE printer)</label></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <button class="btn primary" id="s-save-listener">Save listener setting</button>
+          <button class="btn ghost" id="s-listener-test">📨 Send a test job to the queue</button>
+        </div>
+        <div class="diag" id="s-diag-listener" style="margin-top:10px;">…</div>
+        <!-- ──────────────────────────────────────────────────────── -->
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
           <button class="btn primary" id="s-save-printer">Save printer</button>
           <button class="btn" id="s-usb-connect">🔌 Connect USB</button>
           <button class="btn ghost" id="s-usb-disconnect">Disconnect USB</button>
@@ -3136,10 +3626,13 @@ const SettingsPage = {
     $("s-printer").value     = S.printer_name || "";
     $("s-copies").value      = S.printer_copies || "2";
     $("s-cut").value         = S.printer_cut || "partial";
+    $("s-cut-between").checked = S.printer_cut_between !== "0";
     $("s-drawer").checked    = S.printer_drawer === "1";
     $("s-auto").checked      = S.printer_auto === "1";
     $("s-agent-url").value   = S.printer_agent_url || "";
     $("s-agent-token").value = S.printer_agent_token || "";
+
+    $("s-store-listener").checked = S.printer_store_listener === "1";
 
     $("s-fb-on").checked   = S.firebase_enabled === "1";
     $("s-fb-orders").value = S.firebase_collection_orders || "orders";
@@ -3184,6 +3677,34 @@ const SettingsPage = {
       }
     };
 
+    const refreshListenerRow = ()=>{
+      const badge = $("s-listener-state");
+      if (!badge) return;
+      badge.classList.remove("on","off");
+      const on = S.printer_store_listener === "1";
+      badge.classList.add(on ? "on" : "off");
+      const txt = badge.querySelector("span:last-child");
+      if (txt) txt.textContent = on ? (PrintListener.active ? "listening" : "starting…") : "off";
+    };
+
+    const refreshListenerDiag = ()=>{
+      const el_ = $("s-diag-listener");
+      if (!el_) return;
+      const on = S.printer_store_listener === "1";
+      const lines = [
+        `Setting: ${on ? '<span class="ok">ON (this device listens)</span>' : '<span class="warn">OFF</span>'}`,
+        `Active: ${PrintListener.active ? '<span class="ok">listening</span>' : '<span class="warn">stopped</span>'}`,
+        `Firestore collection: ${escapeHtml(CloudDB.printJobsCol())}`,
+        `Cloud ready: ${CloudDB.ready ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `This device UID: ${escapeHtml(CloudDB.uid || "—")}`,
+        `Processed jobs: ${PrintListener.processedCount} · Failed: ${PrintListener.failedCount}`,
+        `Last printed: ${PrintListener.lastJobAt ? escapeHtml(PrintListener.lastJobAt.toLocaleString()) : '—'}` +
+          (PrintListener.lastJobInfo ? ' (' + escapeHtml(PrintListener.lastJobInfo) + ')' : ''),
+        `Local printer mode (used to print the job): ${escapeHtml(S.printer_mode || 'browser')}`,
+      ];
+      el_.innerHTML = lines.join("\n");
+    };
+
     const refreshDiag = ()=>{
       const el_ = $("s-diag");
       if (!el_) return;
@@ -3200,7 +3721,8 @@ const SettingsPage = {
         `Agent URL: ${S.printer_agent_url ? escapeHtml(S.printer_agent_url) : '<span class="warn">not set</span>'}`,
         `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
         `Print jobs collection: ${escapeHtml(S.firebase_collection_print_jobs || "print_jobs")}`,
-        `Copies: ${escapeHtml(String(S.printer_copies||"2"))} · Cut: ${escapeHtml(S.printer_cut||"partial")} · Drawer: ${S.printer_drawer==="1"?"on":"off"}`,
+        `Copies: ${escapeHtml(String(S.printer_copies||"2"))} · Cut: ${escapeHtml(S.printer_cut||"partial")} · Cut each copy: ${S.printer_cut_between === "0" ? "off" : "on"} · Drawer: ${S.printer_drawer==="1"?"on":"off"}`,
+        `Store listener: ${S.printer_store_listener === "1" ? '<span class="ok">ON</span>' : '<span class="warn">off</span>'}`,
       ];
       el_.innerHTML = lines.join("\n");
     };
@@ -3235,7 +3757,6 @@ const SettingsPage = {
       ].join("\n");
     };
 
-    /* ── install button inside Settings ── */
     const refreshInstallRow = ()=>{
       const btn   = $("s-install");
       const state = $("s-install-state");
@@ -3263,7 +3784,10 @@ const SettingsPage = {
       });
     }
 
-    const refreshAll = ()=>{ refreshPill(); refreshDiag(); refreshSyncDiag(); refreshFbDiag(); refreshInstallRow(); };
+    const refreshAll = ()=>{
+      refreshPill(); refreshDiag(); refreshSyncDiag(); refreshFbDiag();
+      refreshInstallRow(); refreshListenerRow(); refreshListenerDiag();
+    };
     refreshAll();
 
     if (this._timer) clearInterval(this._timer);
@@ -3288,6 +3812,14 @@ const SettingsPage = {
         setTimeout(()=>{ refreshAll(); $("s-diag-sync")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
       });
     }
+    const lpill = document.getElementById("listener-pill");
+    if (lpill && !lpill._bound){
+      lpill._bound = true;
+      lpill.addEventListener("click", ()=>{
+        App.nav("settings");
+        setTimeout(()=>{ refreshAll(); $("s-diag-listener")?.scrollIntoView({behavior:"smooth", block:"center"}); }, 60);
+      });
+    }
 
     $("s-save").addEventListener("click", ()=>{
       S.restaurant_name = $("s-name").value;
@@ -3297,7 +3829,7 @@ const SettingsPage = {
       S.currency_symbol = $("s-sym").value;
       S.secondary_currency = $("s-sec").value;
       S.secondary_rate  = $("s-rate").value;
-      S.delivery_fee    = $("s-delivery").value;
+      S.delivery_fee    = String(Math.max(0, Number($("s-delivery").value) || 0));
       S.receipt_footer  = $("s-footer").value;
       const newTheme = $("s-theme").value;
       const oldTheme = S.theme;
@@ -3314,6 +3846,7 @@ const SettingsPage = {
       S.printer_name      = $("s-printer").value.trim();
       S.printer_copies    = $("s-copies").value;
       S.printer_cut       = $("s-cut").value;
+      S.printer_cut_between = $("s-cut-between").checked ? "1" : "0";
       S.printer_drawer    = $("s-drawer").checked ? "1" : "0";
       S.printer_auto      = $("s-auto").checked ? "1" : "0";
       S.printer_agent_url = $("s-agent-url").value.trim();
@@ -3321,6 +3854,51 @@ const SettingsPage = {
       DB.save("settings");
       Persist.putObject("settings", S);
       toast("Printer settings saved", "success");
+      refreshAll();
+    });
+
+    /* ── Save the store-listener setting and start/stop it live ── */
+    $("s-save-listener").addEventListener("click", ()=>{
+      const on = $("s-store-listener").checked ? "1" : "0";
+      S.printer_store_listener = on;
+      DB.save("settings");
+      Persist.putObject("settings", S);
+
+      if (on){
+        if (S.firebase_enabled !== "1"){
+          toast("Listener needs the shared cloud database enabled first.", "warning", 5000);
+        } else {
+          PrintListener.restart();
+          toast("🏪 Store print listener ON — remote orders will print here", "success");
+        }
+      } else {
+        PrintListener.stop();
+        toast("Store print listener OFF", "info");
+      }
+      refreshAll();
+    });
+
+    /* ── Test button: queue a sample job into Firestore ───────── */
+    $("s-listener-test").addEventListener("click", async ()=>{
+      if (S.firebase_enabled !== "1"){
+        toast("Enable the shared cloud database first", "warning");
+        return;
+      }
+      try{
+        const bytes = buildEscPosReceipt(sampleReceipt(), S, "LISTENER TEST");
+        await CloudSync.queuePrintJob({
+          printer_name: S.printer_name || "",
+          order_no: "TEST-LISTENER",
+          cut: S.printer_cut || "partial",
+          cut_each: S.printer_cut_between !== "0",
+          drawer: false,
+          copies: 1,
+          data: Array.from(bytes),
+        });
+        toast("Test job queued — a listening store device will print it", "success", 5000);
+      }catch(e){
+        toast("Failed to queue test: " + e.message, "error", 6000);
+      }
       refreshAll();
     });
 
@@ -3342,6 +3920,9 @@ const SettingsPage = {
           Realtime.start();
         }
       }
+      /* If the print jobs collection name changed, restart the listener
+         so it picks up the new collection. */
+      if (PrintListener.isEnabled()) PrintListener.restart();
       refreshAll();
     });
 
@@ -3402,6 +3983,7 @@ const SettingsPage = {
           printer_name: S.printer_name || "",
           order_no: "TEST-CLOUD",
           cut: S.printer_cut || "partial",
+          cut_each: S.printer_cut_between !== "0",
           drawer: S.printer_drawer === "1",
           copies: 1,
           data: Array.from(buildEscPosReceipt(sampleReceipt(), S, "CLOUD TEST")),
@@ -3501,7 +4083,6 @@ const FirebaseSync = {
   _authError: null,
 
   async _token(){
-    /* Prefer the token already held by the shared-database session */
     const t = await CloudDB.token();
     if (t) return t;
     if (this._idToken) return this._idToken;
@@ -3604,6 +4185,10 @@ const CloudSync = {
         currency:(DB.settings.currency_symbol||"LBP ").trim(), created_at: nowIso() });
   },
 
+  /* Queue a print job for the store's listener to pick up.
+     The listener atomically claims the job, prints it locally and
+     marks it as "done". "created_by" lets the originating device
+     skip its own job if the same device is also listening. */
   async queuePrintJob(job){
     if (!this.enabled()) throw new Error("Firebase disabled");
     const col = this._col("firebase_collection_print_jobs", "print_jobs");
@@ -3611,11 +4196,13 @@ const CloudSync = {
       printer_name: job.printer_name || "",
       order_no: job.order_no || "",
       cut: job.cut || "partial",
+      cut_each: job.cut_each !== false,
       drawer: job.drawer === true,
       copies: job.copies || 1,
       data: job.data || [],
       status: "pending",
       source: "pizza_pos_web",
+      created_by: CloudDB.uid || null,
       created_at: nowIso(),
     };
     const res = await FirebaseSync.pushDocument(col, doc);
@@ -3624,10 +4211,7 @@ const CloudSync = {
   },
 };
 
-/* ═══════════════════ PWA INSTALLER ═══════════════════
-   Everything needed so a remote phone (Android or iOS) can
-   "Install / Add to Home Screen" and then run Pizza POS
-   full-screen, with an offline-cached shell.                        */
+/* ═══════════════════ PWA INSTALLER ═══════════════════ */
 const PWA = {
   deferredPrompt: null,
   _swRegistered: false,
@@ -3645,7 +4229,6 @@ const PWA = {
            window.navigator.standalone === true;
   },
 
-  /* ── generated app icons (emoji on brand background) ── */
   makeIcon(size, maskable){
     const c = document.createElement("canvas");
     c.width = size; c.height = size;
@@ -3665,10 +4248,6 @@ const PWA = {
     return c.toDataURL("image/png");
   },
 
-  /* ── build & attach the web app manifest ──
-     IMPORTANT: every URL inside the manifest is ABSOLUTE, because
-     the manifest itself is served from a blob: URL. Relative paths
-     would resolve against the blob and break on remote devices.     */
   attachManifest(){
     let icon192 = "", icon512 = "", icon512m = "";
     try{
@@ -3677,7 +4256,7 @@ const PWA = {
       icon512m = this.makeIcon(512, true);
     }catch(e){ console.warn("icon generation failed", e); }
 
-    const dir  = new URL(".", location.href).href;              // folder of this page
+    const dir  = new URL(".", location.href).href;
     const self_ = location.origin + location.pathname + location.search;
 
     const manifest = {
@@ -3721,7 +4300,6 @@ const PWA = {
       link.href = href;
     }
 
-    /* iOS ignores the manifest for icons — it needs apple-touch-icon */
     try{
       let ati = document.querySelector('link[rel="apple-touch-icon"]');
       if (!ati){
@@ -3734,10 +4312,6 @@ const PWA = {
     }catch(e){}
   },
 
-  /* ── register an (optional) service worker ──
-     If a companion `sw.js` is deployed next to this page it will be
-     used for offline caching. If it isn't there we quietly skip it —
-     nothing else depends on it. */
   async registerServiceWorker(){
     if (this._swRegistered) return;
     if (!("serviceWorker" in navigator)) return;
@@ -3753,7 +4327,6 @@ const PWA = {
     }
   },
 
-  /* ── the install button in the top bar ── */
   bindInstallButton(){
     const btn = document.getElementById("install-btn");
     if (!btn || btn._bound) return;
@@ -3793,7 +4366,6 @@ const PWA = {
     this.showInstallHelp();
   },
 
-  /* ── step-by-step help for phones that don't fire beforeinstallprompt ── */
   showInstallHelp(){
     const secure = isSecureContext_();
     let steps;
@@ -3840,7 +4412,6 @@ const PWA = {
     document.getElementById("pwa-help-close").addEventListener("click", ()=>Modal.close());
   },
 
-  /* ── wire everything up ── */
   setup(){
     this.attachManifest();
     this.bindInstallButton();
@@ -3857,7 +4428,6 @@ const PWA = {
       toast("Pizza POS installed 🍕", "success");
     });
 
-    /* React to the user entering / leaving standalone mode */
     const mq = window.matchMedia("(display-mode: standalone)");
     const onChange = ()=>this.refreshButton();
     if (mq.addEventListener) mq.addEventListener("change", onChange);
@@ -3873,6 +4443,7 @@ const App = {
   page: "pos",
   _pagesInited: false,
   _syncTimer: null,
+  _pollTimer: null,
 
   async init(){
     PWA.setup();
@@ -3895,6 +4466,18 @@ const App = {
         status.textContent = "Local-only mode (cloud database disabled in Settings).";
       }
     }
+
+    /* Start the store print listener as soon as we know the setting.
+       It only activates if the checkbox is ON in Settings. */
+    PrintListener.start();
+
+    /* Safety net: a slow poll (every 20s) catches jobs on devices
+       where Firestore realtime listeners occasionally stall. It's
+       cheap — limit(10) on a filtered query. */
+    if (this._pollTimer) clearInterval(this._pollTimer);
+    this._pollTimer = setInterval(()=>{
+      if (PrintListener.isEnabled()) PrintListener.poll();
+    }, 20000);
   },
 
   bindLogin(){
@@ -3929,6 +4512,7 @@ const App = {
     window.addEventListener("online", ()=>{
       SyncStatus.set(CloudDB.ready ? "synced" : "local",
         CloudDB.ready ? "Back online" : "Offline — local data only");
+      if (PrintListener.isEnabled()) PrintListener.restart();
     });
     window.addEventListener("offline", ()=>{
       SyncStatus.set("local", "Offline — changes will sync when back online");
@@ -3970,6 +4554,9 @@ const App = {
     }
     this.nav("pos");
     PWA.refreshButton();
+
+    /* In case the listener started before login, keep it alive. */
+    if (PrintListener.isEnabled()) PrintListener.start();
   },
 
   nav(page){
@@ -3998,7 +4585,6 @@ const App = {
     POSPage.updateCartFab();
   },
 
-  /* ── called whenever a remote change lands ── */
   scheduleSyncRefresh(){
     if (this._syncTimer) return;
     this._syncTimer = setTimeout(()=>{
@@ -4042,7 +4628,6 @@ window.addEventListener("DOMContentLoaded", ()=>{
     console.error("Init failed:", err);
     const el = document.getElementById("login-err");
     if (el) el.textContent = "Startup error: " + (err.message || err);
-    /* Never leave the operator locked out — fall back to local data. */
     try{
       if (!App._pagesInited){
         App.bindLogin(); App.bindMisc();
