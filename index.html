@@ -51,11 +51,96 @@ input,select,textarea,button{font-size:13px;}
 .btn.chip.active{background:var(--primary); color:var(--on-primary); border-color:var(--primary);}
 .btn.icon{background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 10px;}
 
-input,select,textarea{background:var(--surface2); border:1px solid var(--border);
+/* ── Text inputs / selects / textareas (checkboxes excluded) ───────── */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea{
+  background:var(--surface2); border:1px solid var(--border);
   border-radius:9px; padding:8px 10px; font-size:13px; color:var(--text);
-  width:100%; outline:none; transition:border .15s; -webkit-appearance:none; appearance:none;}
-input:focus,select:focus,textarea:focus{border-color:var(--primary);}
+  width:100%; outline:none; transition:border .15s, box-shadow .15s;
+  -webkit-appearance:none; appearance:none;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus{ border-color:var(--primary); box-shadow:0 0 0 3px rgba(15,23,42,.08); }
+body.dark input:not([type="checkbox"]):not([type="radio"]):focus,
+body.dark select:focus,
+body.dark textarea:focus{ box-shadow:0 0 0 3px rgba(248,250,252,.10); }
 textarea{resize:vertical; font-family:inherit;}
+
+/* ═══════════════════════════════════════════════════════════════
+   REAL-LOOKING CHECKBOXES & RADIOS
+   ═══════════════════════════════════════════════════════════════ */
+input[type="checkbox"],
+input[type="radio"]{
+  -webkit-appearance:none; appearance:none;
+  width:20px; height:20px;
+  min-width:20px; min-height:20px;
+  flex:0 0 auto;
+  padding:0; margin:0;
+  border:2px solid var(--border);
+  background:var(--surface);
+  border-radius:6px;
+  display:inline-grid;
+  place-content:center;
+  cursor:pointer;
+  vertical-align:middle;
+  position:relative;
+  transition:background .15s, border-color .15s, box-shadow .15s, transform .1s;
+}
+input[type="radio"]{ border-radius:50%; }
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled){ border-color:var(--text3); }
+
+input[type="checkbox"]:active:not(:disabled),
+input[type="radio"]:active:not(:disabled){ transform:scale(.92); }
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible{
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(15,23,42,.18);
+}
+body.dark input[type="checkbox"]:focus-visible,
+body.dark input[type="radio"]:focus-visible{
+  box-shadow:0 0 0 3px rgba(248,250,252,.22);
+}
+
+/* Checked state — filled box with a crisp white checkmark */
+input[type="checkbox"]:checked{
+  background:var(--primary);
+  border-color:var(--primary);
+}
+input[type="checkbox"]:checked::after{
+  content:"";
+  width:5px; height:10px;
+  border:solid var(--on-primary);
+  border-width:0 2.5px 2.5px 0;
+  transform:rotate(45deg) translate(-1px,-1px);
+  margin-top:-2px;
+}
+
+/* Checked state — filled radio dot */
+input[type="radio"]:checked{
+  border-color:var(--primary);
+  background:var(--surface);
+}
+input[type="radio"]:checked::after{
+  content:"";
+  width:10px; height:10px;
+  border-radius:50%;
+  background:var(--primary);
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled{
+  opacity:.45; cursor:not-allowed;
+}
+
+/* Checkbox label rows -------------------------------------------------- */
+label > input[type="checkbox"],
+label > input[type="radio"]{ pointer-events:auto; }
 
 .card{background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);}
 h1{font-size:18px; font-weight:800; letter-spacing:-.3px; margin:0 0 8px;}
@@ -257,8 +342,10 @@ html[dir="rtl"] .tabs-bar .tab-del{margin-left:0; margin-right:6px;}
   align-items:center; margin-bottom:8px;}
 .form-row label{color:var(--text2); font-size:12px;}
 .form-row.checkbox{grid-template-columns:1fr; gap:4px;}
-.form-row.checkbox label{display:flex; align-items:center; gap:8px; cursor:pointer;}
-.form-row.checkbox input[type=checkbox]{width:auto;}
+.form-row.checkbox label{display:flex; align-items:center; gap:8px; cursor:pointer;
+  color:var(--text); font-size:13px; user-select:none;}
+.form-row.checkbox input[type=checkbox],
+.form-row.checkbox input[type=radio]{ width:20px; height:20px; }
 
 .cart-fab{position:fixed; bottom:calc(72px + env(safe-area-inset-bottom, 0px));
   right:14px; z-index:60; background:var(--primary); color:var(--on-primary);
@@ -312,9 +399,9 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 .opt-builder{background:var(--surface2); border:1px solid var(--border);
   border-radius:12px; padding:10px; margin-bottom:8px;}
 .opt-builder .row{display:flex; gap:6px; align-items:center; margin-bottom:6px;}
-.opt-builder .row input[type=checkbox]{width:auto;}
+.opt-builder .row input[type=checkbox]{ width:20px; height:20px; }
 .opt-builder .row label{display:flex; align-items:center; gap:5px;
-  font-size:11px; color:var(--text2); white-space:nowrap;}
+  font-size:11px; color:var(--text2); white-space:nowrap; cursor:pointer;}
 
 .danger-card{border:2px solid var(--danger) !important;}
 .danger-card h3{color:var(--danger);}
@@ -2311,21 +2398,82 @@ const USBPrinter = {
   async connect(){
     if (!this.isSupported()) throw new Error("WebUSB not supported in this browser (use Chrome or Edge on desktop)");
     if (!isSecureContext_()) throw new Error("WebUSB requires HTTPS or localhost");
+
     let dev = null;
     try{
       const known = await navigator.usb.getDevices();
-      if (known && known.length) dev = known[0];
+      if (known && known.length){
+        const saved = STORE.get("usb_printer", null);
+        if (saved){
+          const match = known.find(d => d.vendorId === saved.vid && d.productId === saved.pid);
+          dev = match || known[0];
+        } else {
+          dev = known[0];
+        }
+      }
     }catch(e){}
+
     if (!dev){
-      dev = await navigator.usb.requestDevice({ filters:[
-        { classCode:7 }, { classCode:0xFF }, {}
-      ]});
+      try{
+        dev = await navigator.usb.requestDevice({ filters:[
+          { classCode:7 }, { classCode:0xFF }, {}
+        ]});
+      }catch(e){
+        const m = String(e.message || e);
+        if (/no device selected/i.test(m) || /cancel/i.test(m)){
+          throw new Error("No USB device selected — pick your printer in the browser dialog.");
+        }
+        throw e;
+      }
     }
-    try{ await dev.open(); }
-    catch(e){ if (!String(e.message||"").match(/already open/i)) throw e; }
-    if (dev.configuration === null) await dev.selectConfiguration(1);
+
+    // If somehow already open in this context, close it first.
+    if (dev.opened){
+      try{ await dev.close(); }catch(e){}
+    }
+
+    // Try to open — retry on access-denied (the OS may still be releasing it).
+    let openErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++){
+      try{
+        await dev.open();
+        openErr = null;
+        break;
+      }catch(e){
+        const msg = String(e.message || e);
+        if (/already open/i.test(msg)){ openErr = null; break; }
+        openErr = e;
+        if (/access denied/i.test(msg)){
+          await sleep(500);
+          continue;
+        }
+        break;
+      }
+    }
+    if (openErr) throw openErr;
+
+    // Select a configuration.
+    if (dev.configuration === null){
+      let cfgOk = false, cfgErr = null;
+      try{ await dev.selectConfiguration(1); cfgOk = true; }
+      catch(e){
+        cfgErr = e;
+        for (const cfg of (dev.configurations || [])){
+          try{ await dev.selectConfiguration(cfg.configurationValue); cfgOk = true; break; }
+          catch(e2){ cfgErr = e2; }
+        }
+      }
+      if (!cfgOk){
+        try{ await dev.close(); }catch(e){}
+        throw new Error("Cannot select USB configuration: " +
+          ((cfgErr && cfgErr.message) || cfgErr || "unknown"));
+      }
+    }
+
+    // Find a bulk/interrupt OUT endpoint.
     let epNum = null, ifaceNum = 0;
-    for (const i of dev.configuration.interfaces){
+    const ifaces = (dev.configuration && dev.configuration.interfaces) || [];
+    for (const i of ifaces){
       for (const alt of i.alternates){
         for (const e of alt.endpoints){
           if (e.direction === "out" && (e.type === "bulk" || e.type === "interrupt")){
@@ -2340,7 +2488,18 @@ const USBPrinter = {
       try{ await dev.close(); }catch(e){}
       throw new Error("No OUT endpoint on this device — is it a printer?");
     }
-    try{ await dev.claimInterface(ifaceNum); }catch(e){}
+
+    // Claim the interface (another handle may already hold it).
+    try{
+      await dev.claimInterface(ifaceNum);
+    }catch(e){
+      const msg = String(e.message || e);
+      if (!/already/i.test(msg)){
+        try{ await dev.close(); }catch(e2){}
+        throw new Error("Could not claim USB interface: " + msg);
+      }
+    }
+
     this.device = dev;
     this.endpoint = epNum;
     this.ifaceNum = ifaceNum;
@@ -2361,10 +2520,17 @@ const USBPrinter = {
         if (match) dev = match;
       }
       try{ await dev.open(); }
-      catch(e){ if (!String(e.message||"").match(/already open/i)) return false; }
-      if (dev.configuration === null) await dev.selectConfiguration(1);
+      catch(e){
+        const msg = String(e.message || e);
+        if (!/already open/i.test(msg) && !/access denied/i.test(msg)) return false;
+        if (/access denied/i.test(msg)) return false; // don't retry in background
+      }
+      if (dev.configuration === null){
+        try{ await dev.selectConfiguration(1); }catch(e){ return false; }
+      }
       let epNum = null, ifaceNum = 0;
-      for (const i of dev.configuration.interfaces){
+      const ifaces = (dev.configuration && dev.configuration.interfaces) || [];
+      for (const i of ifaces){
         for (const alt of i.alternates){
           for (const e of alt.endpoints){
             if (e.direction === "out" && (e.type === "bulk" || e.type === "interrupt")){
@@ -2389,7 +2555,6 @@ const USBPrinter = {
 
   async send(bytes){
     if (!this.isConnected()){
-      // Try to reconnect once
       const ok = await this.autoReconnect();
       if (!ok) throw new Error("USB printer not connected");
     }
@@ -2405,6 +2570,85 @@ const USBPrinter = {
         }
       }
     } finally { this._busy = false; }
+  },
+
+  /* ── Troubleshooting help ───────────────────────────── */
+  showHelp(errMsg){
+    const ua = navigator.userAgent || "";
+    const isWin   = /Win/i.test(ua);
+    const isMac   = /Mac/i.test(ua);
+    const isLinux = /Linux/i.test(ua) && !/Android/i.test(ua);
+
+    let osSteps = "";
+    if (isWin){
+      osSteps = `
+        <li><b>Windows:</b> The printer is claimed by the Windows print driver.
+            WebUSB cannot share it.</li>
+        <li>Download <b>Zadig</b> from <b>zadig.akeo.ie</b> (free).</li>
+        <li>Plug the printer in, open Zadig, choose the printer from the dropdown,
+            select <b>WinUSB</b> as the target driver, click <b>Replace Driver</b>.</li>
+        <li>Unplug, replug the printer, then click <b>Connect USB</b> again.</li>
+        <li class="faint">⚠ After this, Windows' own print dialog will no longer
+            use this printer — only this app will. To undo, use Device Manager
+            → Uninstall device → scan for hardware changes.</li>`;
+    } else if (isMac){
+      osSteps = `
+        <li><b>macOS:</b> Quit any app that may be using the printer
+            (System Settings → Printers &amp; Scanners, Preview, other browsers).</li>
+        <li>Unplug, replug the printer, then try <b>Connect USB</b> again.</li>
+        <li>If it still fails, grant Chrome permission under
+            <b>System Settings → Privacy &amp; Security → Input Monitoring</b>
+            (some USB HID devices appear there).</li>`;
+    } else if (isLinux){
+      osSteps = `
+        <li><b>Linux:</b> The kernel module <code>usblp</code> is holding the printer.</li>
+        <li>Run <code>sudo modprobe -r usblp</code> (until reboot), or</li>
+        <li>Add a udev rule so your user can claim it:
+            <code>/etc/udev/rules.d/99-usb-printer.rules</code><br>
+            <code>SUBSYSTEM=="usb", ATTR{idVendor}=="XXXX", ATTR{idProduct}=="YYYY", MODE="0666", GROUP="plugdev"</code></li>
+        <li>Then <code>sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</code>,
+            unplug/replug, and try again.</li>`;
+    } else {
+      osSteps = `<li>Try a different USB port, a different cable, or restart the browser.</li>`;
+    }
+
+    Modal.open(`
+      <div class="m-head"><h2>🔌 USB Connection Help</h2></div>
+      <div class="m-body">
+        <div class="danger-warn" style="margin-bottom:12px;">
+          <b>${escapeHtml(errMsg || "Access denied")}</b>
+        </div>
+        <div class="faint" style="font-size:12px; margin-bottom:10px; line-height:1.7;">
+          WebUSB needs <b>exclusive access</b> to the printer. If any other program,
+          driver, or browser tab is using it, Chrome returns <b>Access denied</b>.
+        </div>
+        <ol class="install-steps" style="font-size:12px;">
+          <li><b>Close every other tab</b> of this app — only one tab can hold the printer.</li>
+          <li>Close any other app that might use the printer (Notepad, Preview,
+              Word, the OS print spooler, another browser).</li>
+          ${osSteps}
+          <li>Still stuck? Open <code>chrome://settings/content/usbDevices</code>
+              and remove the printer, then reload the page and click
+              <b>Connect USB</b> to grant access again.</li>
+          <li class="faint">Easiest fallback: switch <b>Printer mode</b> to
+              <b>Browser</b> or <b>Agent</b> — no raw USB access needed.</li>
+        </ol>
+      </div>
+      <div class="m-foot">
+        <button class="btn" id="usb-help-mode-browser">Switch to Browser mode</button>
+        <button class="btn primary" id="usb-help-close">OK</button>
+      </div>`);
+
+    const closeBtn = document.getElementById("usb-help-close");
+    if (closeBtn) closeBtn.addEventListener("click", ()=>Modal.close());
+    const swBtn = document.getElementById("usb-help-mode-browser");
+    if (swBtn) swBtn.addEventListener("click", ()=>{
+      DB.settings.printer_mode = "browser";
+      DB.save("settings");
+      Persist.putObject("settings", DB.settings);
+      Modal.close();
+      toast("Printer mode set to Browser", "info");
+    });
   },
 };
 
@@ -2646,8 +2890,12 @@ const Printer = {
       toast(`🖨  Printed ${jobs.length} ${jobs.length===1?"copy":"copies"} (USB)`, "success");
       return { ok:true };
     }catch(e){
-      toast("USB print failed: " + e.message, "error", 6000);
-      return { ok:false, error:e.message };
+      const msg = e.message || String(e);
+      toast("USB print failed: " + msg, "error", 6000);
+      if (/access denied|not connected/i.test(msg)){
+        setTimeout(()=>USBPrinter.showHelp(msg), 400);
+      }
+      return { ok:false, error:msg };
     }
   },
 
@@ -5257,7 +5505,7 @@ const SettingsPage = {
       if (!btn || !state) return;
       const txt = state.querySelector("span:last-child");
       state.classList.remove("ok","bad","warn");
-      if (isStandalone()){
+      if (PWA.isStandalone()){
         state.classList.add("ok"); if (txt) txt.textContent = "Installed";
         btn.disabled = true;
       } else if (!isSecureContext_()){
@@ -5457,7 +5705,12 @@ const SettingsPage = {
         toast(`USB connected (VID ${info.vid} PID ${info.pid})`, "success");
         refreshAll();
       }catch(e){
-        toast("USB connect failed: " + e.message, "error", 6000);
+        const msg = e.message || String(e);
+        toast("USB connect failed: " + msg, "error", 6000);
+        // Access-denied / claim / config errors are almost always driver-related.
+        if (/access denied|claim|configuration|no out endpoint/i.test(msg)){
+          setTimeout(()=>USBPrinter.showHelp(msg), 400);
+        }
         refreshAll();
       }
     });
@@ -5869,6 +6122,8 @@ const PWA = {
     this.registerServiceWorker();
   },
 };
+
+function isStandalone(){ return PWA.isStandalone(); }
 
 /* ═══════════════════ APP ═══════════════════ */
 const App = {
