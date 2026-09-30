@@ -3037,6 +3037,15 @@ const Printer = {
     }
   },
 
+  /* ── Cloud print ────────────────────────────────────────────────
+     We send BOTH:
+       • data  — the raw concatenated ESC/POS bytes (legacy listeners)
+       • order — the full order payload (new listeners rebuild the receipt
+                 locally with their OWN settings so remote printing
+                 matches local printing exactly: 2 separated copies,
+                 cut between copies, drawer kick, etc.)
+     The queued copy count is forced to at least 2 so remote printing
+     always produces 2 separated copies like local printing. */
   async _cloud(jobs, order, settings){
     if (settings.firebase_enabled !== "1"){
       toast("Cloud print needs Firebase enabled (Settings → Cloud).", "warning", 5000);
@@ -3049,14 +3058,16 @@ const Printer = {
     try{
       const all = [];
       for (const j of jobs){ for (let k = 0; k < j.full.length; k++) all.push(j.full[k]); }
+      const remoteCopies = Math.max(2, Math.min(3, jobs.length));
       await CloudSync.queuePrintJob({
         printer_name: settings.printer_name || "",
         order_no: order.no || "",
         cut: settings.printer_cut || "partial",
         cut_each: settings.printer_cut_between !== "0",
         drawer: settings.printer_drawer === "1",
-        copies: jobs.length,
+        copies: remoteCopies,
         data: all,
+        order: order,
       });
       toast("☁  Print job queued — store printer will pick it up", "success");
       return { ok:true };
@@ -3186,6 +3197,11 @@ const Printer = {
    Runs on the STORE device. Watches the print_jobs collection for
    pending jobs created by OTHER devices and prints them locally.
 
+   When a job carries the full order payload (new format), the listener
+   rebuilds the receipt using THIS device's own printer settings, so the
+   remote printout is identical to a local print — including the number
+   of separated copies (forced to 2), cut between copies, and drawer kick.
+
    Fixes:
    • Skips its own jobs based on device UID AND local device marker.
    • Uses a transactional claim so two listeners can't both print.
@@ -3307,7 +3323,8 @@ const PrintListener = {
       }
       const job = claim.data || {};
       const bytes = new Uint8Array(job.data || []);
-      if (!bytes.length) throw new Error("job has no data");
+      const hasOrder = job.order && typeof job.order === "object" && Array.isArray(job.order.items);
+      if (!bytes.length && !hasOrder) throw new Error("job has no data");
 
       // Try printing; retry once if the first attempt fails.
       let lastErr = null;
@@ -3345,6 +3362,22 @@ const PrintListener = {
   },
 
   async _printLocal(bytes, job){
+    // ── NEW PATH: full order payload present → rebuild & print locally ──
+    // This guarantees the remote printout matches local printing: same
+    // separated copies (at least 2), same cut between copies, same labels.
+    if (job && job.order && typeof job.order === "object" && Array.isArray(job.order.items)){
+      const storeSettings = Object.assign({}, DB.settings);
+      // Force at least 2 separated copies for remote jobs.
+      const wantCopies = Math.max(2, Math.min(3, Number(job.copies) || 2));
+      storeSettings.printer_copies = String(wantCopies);
+      if (job.cut) storeSettings.printer_cut = job.cut;
+      if (job.cut_each !== undefined)
+        storeSettings.printer_cut_between = job.cut_each ? "1" : "0";
+      if (job.drawer) storeSettings.printer_drawer = "1";
+      return await this._printOrder(job.order, storeSettings);
+    }
+
+    // ── LEGACY PATH: raw ESC/POS bytes ──
     const mode = (DB.settings.printer_mode || "browser").toLowerCase();
     if (mode === "usb"){
       if (!USBPrinter.isConnected()){
@@ -3381,6 +3414,58 @@ const PrintListener = {
     // Browser fallback for the store device — decode ESC/POS and print via iframe.
     const text = this._decodeEscPosText(bytes);
     await Printer.printTextViaIframe([text]);
+  },
+
+  /* Rebuild and print an order using THIS device's settings, emitting the
+     same separated copies as local printing (body + cut per copy). */
+  async _printOrder(order, settings){
+    const mode = (settings.printer_mode || "browser").toLowerCase();
+    const jobs = Printer._buildJobs(order, settings);
+
+    if (mode === "usb"){
+      if (!USBPrinter.isConnected()){
+        const ok = await USBPrinter.autoReconnect();
+        if (!ok) throw new Error("USB printer not connected on store device");
+      }
+      for (const j of jobs){
+        await USBPrinter.send(j.body);
+        await sleep(Math.min(j.ms, 4000));
+        if (j.cut && j.cut.length){
+          try{ await USBPrinter.send(j.cut); }catch(e){}
+          await sleep(800);
+        }
+      }
+      return;
+    }
+
+    if (mode === "agent"){
+      const url = (settings.printer_agent_url || "").trim();
+      if (!url) throw new Error("no agent URL on store device");
+      const headers = { "Content-Type":"application/json" };
+      if (settings.printer_agent_token) headers["X-Auth-Token"] = settings.printer_agent_token;
+      const body = {
+        printer: settings.printer_name || "",
+        order_no: order.no || "",
+        cut: settings.printer_cut || "partial",
+        cut_each: settings.printer_cut_between !== "0",
+        drawer: settings.printer_drawer === "1",
+        jobs: jobs.map(j => ({ label: j.label, data: Array.from(j.full) })),
+      };
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 15000);
+      let r;
+      try{
+        r = await fetch(url.replace(/\/+$/,"") + "/print", {
+          method:"POST", headers, body: JSON.stringify(body), signal: ctrl.signal,
+        });
+      } finally { clearTimeout(timer); }
+      if (!r.ok) throw new Error("agent HTTP " + r.status);
+      return;
+    }
+
+    // Browser fallback — each copy is its own block, so copies are separated.
+    const blocks = jobs.map(j => buildReceiptText(order, settings, j.label));
+    await Printer.printTextViaIframe(blocks);
   },
 
   _decodeEscPosText(bytes){
@@ -4078,13 +4163,13 @@ const POSPage = {
         const show = isExtras || !largeOnly || isLarge;
         let hint;
         if (isExtras) hint = ` <span class="faint">(optional · tap to toggle)</span>`;
-        else if (isFlavor && largeOnly) hint = ` <span class="faint">(choose 1 or 2)</span>`;
+        else if (isFlavor && largeOnly) hint = ` <span class="faint">(optional · choose 1 or 2)</span>`;
         else if (grp.multi && grp.max_choices) hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
         else if (grp.multi) hint = " <span class='faint'>(multiple)</span>";
         else hint = "";
-        html += `<div class="opt-group" style="display:${show?"block":"none"};">
-          <h3>${escapeHtml(grp.name)}${hint}</h3>
-          <div class="opt-chips">`;
+        html += `<div class="opt-group" style="display:${show?"block":"none"};">`
+          + `<h3>${escapeHtml(grp.name)}${hint}</h3>`
+          + `<div class="opt-chips">`;
         for (const ch of grp.choices){
           let on = false;
           if (isSize) on = state.size === ch.label;
@@ -4153,13 +4238,10 @@ const POSPage = {
       });
     };
 
+    // ── Flavor selection is optional, even for Large pizzas ──
+    // The customer may simply want a Large pizza with no flavor marked.
     const finalize = ()=>{
-      const isLarge = state.size === "Large";
       const chosen = collectChosen();
-      if (isLarge){
-        const flavors = chosen.filter(c=>c.group === "Flavor");
-        if (flavors.length < 1){ toast(t("choose_flavor_large"), "warning"); return; }
-      }
       let unit = computeUnitPrice(p, chosen);
       const ov = String(state.override||"").trim();
       if (ov !== "" && Number.isFinite(Number(ov))) unit = Math.max(0, Number(ov));
@@ -5734,7 +5816,7 @@ const SettingsPage = {
           order_no: "TEST-LISTENER",
           cut: S.printer_cut || "partial",
           cut_each: S.printer_cut_between !== "0",
-          drawer: false, copies: 1,
+          drawer: false, copies: 2,
           data: Array.from(bytes),
         });
         toast(t("test_job_queued"), "success", 5000);
@@ -5871,8 +5953,9 @@ const SettingsPage = {
           cut: S.printer_cut || "partial",
           cut_each: S.printer_cut_between !== "0",
           drawer: S.printer_drawer === "1",
-          copies: 1,
+          copies: 2,
           data: Array.from(buildEscPosReceipt(sampleReceipt(), S, "CLOUD TEST")),
+          order: sampleReceipt(),
         });
         toast("Cloud test job queued", "success", 5000);
       }catch(e){ toast("Cloud test failed: " + e.message, "error", 6000); }
@@ -6057,6 +6140,7 @@ const CloudSync = {
       drawer: job.drawer === true,
       copies: job.copies || 1,
       data: job.data || [],
+      order: job.order || null,
       status: "pending",
       source: "pizza_pos_web",
       created_by: CloudDB.uid || null,
@@ -6717,6 +6801,14 @@ window.addEventListener("DOMContentLoaded", ()=>{
   );
   console.log("  • Browser:  Consolas/Menlo + weight 700 + text-stroke");
   console.log("  • Thermal:  bold + double-strike on every line");
+  console.log(
+    "%c[Remote Print] fix installed — remote cloud jobs print 2 separated copies automatically.",
+    "background:#16a34a;color:#fff;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
+  );
+  console.log(
+    "%c[Large Pizza] flavor selection is now optional.",
+    "background:#f59e0b;color:#fff;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
+  );
 })();
 </script>
 </body>
