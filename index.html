@@ -6334,6 +6334,275 @@ window.addEventListener("DOMContentLoaded", ()=>{
     }catch(e){}
   });
 });
+/* ═══════════════════════════════════════════════════════════════
+   BOLD RECEIPT OVERRIDE
+   Forces every receipt to print bold in ALL modes:
+     • Browser   → heavy CSS (Consolas + 700 + text-stroke)
+     • USB/Agent → bold + double-strike on every ESC/POS line
+     • Cloud     → same buffer as USB/Agent, queued remotely
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  "use strict";
+
+  if (typeof EscPos === "undefined" || typeof Printer === "undefined"){
+    console.error("[Bold Receipt] EscPos or Printer not found — aborting.");
+    return;
+  }
+
+  /* ── 1. Add double-strike to EscPos (darker than bold alone) ── */
+  EscPos.prototype.doubleStrike = function(on){
+    return this._u8(0x1B, 0x47, on ? 1 : 0);   // ESC G n
+  };
+
+  /* ── 2. Rebuild the ESC/POS body — bold + double-strike ─────── */
+  const newBuildEscPosBody = function(order, settings, copyLabel){
+    const sym = settings.currency_symbol || "LBP ";
+    const p = new EscPos();
+
+    p.init();
+    p.bold(true);            // ← bold ON, stays on for every line
+    p.doubleStrike(true);    // ← double-strike ON (extra darkness)
+
+    /* Header */
+    p.align(1);
+    if (settings.restaurant_name){
+      p.size(1,1);
+      p.line(settings.restaurant_name);
+      p.size(0,0);
+    }
+    if (settings.tagline) p.line(settings.tagline);
+    if (settings.address) p.line(settings.address);
+    if (settings.phone)   p.line(settings.phone);
+
+    p.align(0);
+    p.line(sep("-"));
+
+    if (copyLabel){
+      p.align(1);
+      p.line("*** " + copyLabel + " ***");
+      p.align(0);
+      p.line(sep("-"));
+    }
+
+    const when = new Date().toLocaleString([], { hour12:false });
+    p.line(lr("Order: " + order.no, when));
+    if (order.customer_name)  p.line("Customer: " + order.customer_name);
+    if (order.customer_phone) p.line("Phone: " + order.customer_phone);
+    p.line("Type: " + (order.type || "Delivery"));
+    p.line(sep("-"));
+
+    /* Items */
+    for (const it of order.items){
+      p.line(it.name);
+      const opts = (it.options||[]).map(o=>o.label).join(", ");
+      if (opts) p.line("  " + opts);
+      if (it.note) p.line("  Note: " + it.note);
+      p.line(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym),
+                fmtMoney(it.line, sym)));
+    }
+
+    p.line(sep("-"));
+    p.line(lr("Subtotal", fmtMoney(order.subtotal, sym)));
+    if (order.discount) p.line(lr("Discount", "-" + fmtMoney(order.discount, sym)));
+    if (order.delivery) p.line(lr("Delivery", fmtMoney(order.delivery, sym)));
+    else                p.line(lr("Delivery", "FREE"));
+
+    /* Grand total — extra big */
+    p.line(sep("="));
+    p.size(1,1);
+    p.line(lr("TOTAL", fmtMoney(order.total, sym)));
+    p.size(0,0);
+
+    const rate = Number(settings.secondary_rate)||90000;
+    const sec  = (settings.secondary_currency||"USD").toUpperCase();
+    const secSym = sec === "USD" ? "$" : sec + " ";
+    if (rate){
+      p.align(1);
+      p.line(secSym + (Number(order.total)/rate).toFixed(2) + "  @ " + rate.toFixed(0));
+      p.align(0);
+    }
+    p.line(sep("="));
+
+    p.line(lr("Payment", order.payment_method || "Cash"));
+    p.line(sep("-"));
+    if (settings.receipt_footer){
+      p.align(1); p.line(settings.receipt_footer); p.align(0);
+    }
+
+    p.doubleStrike(false);
+    p.bold(false);
+    return p.bytes();
+  };
+
+  /* Overwrite both the scope binding and the window property */
+  try { buildEscPosBody = newBuildEscPosBody; } catch(e){}
+  try { window.buildEscPosBody = newBuildEscPosBody; } catch(e){}
+
+  /* ── 3. Heavy CSS for browser-mode iframe printing ──────────── */
+  Printer.printTextViaIframe = async function(blocks){
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      html,body{margin:0;padding:0;background:#fff;color:#000;}
+
+      .receipt-copy{
+        /* Consolas / Menlo have genuine heavy weights */
+        font-family:'Consolas','Menlo','DejaVu Sans Mono',
+                    'Courier New',ui-monospace,monospace;
+        font-size:12px;
+        font-weight:700;
+        /* Extra weight on every glyph — turns thin fonts solid black */
+        -webkit-text-stroke:0.35px #000;
+        text-shadow:0 0 0.6px #000, 0 0 0.4px #000;
+        line-height:1.35;
+        letter-spacing:0.1px;
+        white-space:pre;
+        padding:6mm 4mm;
+        page-break-after:always;
+        -webkit-font-smoothing:none;
+      }
+      .receipt-copy:last-child{ page-break-after:auto; }
+
+      @media print{
+        @page{ size:80mm auto; margin:0; }
+        .receipt-copy{
+          -webkit-text-stroke:0.35px #000;
+          text-shadow:0 0 0.6px #000;
+        }
+      }
+    </style></head><body>${
+      blocks.map(b => `<div class="receipt-copy">${escapeHtml(b)}</div>`).join("")
+    }</body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+    document.body.appendChild(iframe);
+
+    try{
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open(); doc.write(html); doc.close();
+      await new Promise(r=>setTimeout(r, 250));
+      const w = iframe.contentWindow;
+      w.focus(); w.print();
+      setTimeout(()=>{ try{ iframe.remove(); }catch(e){} }, 2500);
+    }catch(e){
+      try{ iframe.remove(); }catch(_){}
+      const area = document.getElementById("receipt-area");
+      area.innerHTML = blocks.map(b =>
+        `<div class="receipt-copy">${escapeHtml(b + "\n\n\n\n")}</div>`
+      ).join("");
+      setTimeout(()=>window.print(), 80);
+    }
+  };
+
+  /* ── 4. Same treatment for printText (Close Cash / test) ────── */
+  const _iframePrinter = Printer.printTextViaIframe;
+  Printer.printText = async function(text, settings){
+    const mode = (settings.printer_mode || "browser").toLowerCase();
+
+    if (mode === "browser"){
+      await _iframePrinter.call(Printer, [text]);
+      return { ok:true };
+    }
+
+    const p = new EscPos();
+    p.init();
+    p.bold(true);
+    p.doubleStrike(true);
+    p.align(0);
+    for (const line of String(text).split("\n")) p.line(line);
+    if (settings.printer_drawer === "1") p.kickDrawer();
+    p.cut(settings.printer_cut || "partial");
+    p.doubleStrike(false);
+    p.bold(false);
+    const bytes = p.bytes();
+
+    if (mode === "usb"){
+      if (!USBPrinter.isConnected()){
+        const ok = await USBPrinter.autoReconnect();
+        if (!ok){ toast("USB printer not connected","warning"); return { ok:false }; }
+      }
+      try{
+        await USBPrinter.send(bytes);
+        toast("🖨  Printed (USB)","success");
+        return { ok:true };
+      }catch(e){
+        toast("USB print failed: " + e.message,"error",5000);
+        return { ok:false };
+      }
+    }
+
+    if (mode === "agent"){
+      const url = (settings.printer_agent_url || "").trim();
+      if (!url){ toast("Set Print Agent URL","warning"); return { ok:false }; }
+      try{
+        const headers = { "Content-Type":"application/json" };
+        if (settings.printer_agent_token)
+          headers["X-Auth-Token"] = settings.printer_agent_token;
+        const ctrl = new AbortController();
+        const timer = setTimeout(()=>ctrl.abort(), 12000);
+        let r;
+        try{
+          r = await fetch(url.replace(/\/+$/,"") + "/print", {
+            method:"POST", headers,
+            body: JSON.stringify({
+              printer: settings.printer_name || "",
+              order_no: "CLOSE-CASH",
+              cut: settings.printer_cut || "partial",
+              cut_each: false,
+              drawer: settings.printer_drawer === "1",
+              jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
+            }),
+            signal: ctrl.signal,
+          });
+        } finally { clearTimeout(timer); }
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        toast("🖨  Sent to agent","success");
+        return { ok:true };
+      }catch(e){
+        toast("Print agent failed: " + e.message,"error",5000);
+        return { ok:false };
+      }
+    }
+
+    if (mode === "cloud"){
+      if (settings.firebase_enabled !== "1"){
+        toast("Cloud print needs Firebase","warning");
+        return { ok:false };
+      }
+      if (!CloudDB.ready){
+        toast("Cloud not connected","error");
+        return { ok:false };
+      }
+      try{
+        await CloudSync.queuePrintJob({
+          printer_name: settings.printer_name || "",
+          order_no: "CLOSE-CASH",
+          cut: settings.printer_cut || "partial",
+          cut_each: false,
+          drawer: settings.printer_drawer === "1",
+          copies: 1, data: Array.from(bytes),
+        });
+        toast("☁  Close Cash queued","success");
+        return { ok:true };
+      }catch(e){
+        toast("Cloud print failed: " + e.message,"error",5000);
+        return { ok:false };
+      }
+    }
+
+    await _iframePrinter.call(Printer, [text]);
+    return { ok:true };
+  };
+
+  /* ── 5. Console confirmation ────────────────────────────────── */
+  console.log(
+    "%c[Bold Receipt] override installed — every receipt is now bold.",
+    "background:#0f172a;color:#f8fafc;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
+  );
+  console.log("  • Browser:  Consolas/Menlo + weight 700 + text-stroke");
+  console.log("  • Thermal:  bold + double-strike on every line");
+})();
 </script>
 </body>
 </html>
