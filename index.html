@@ -1163,6 +1163,7 @@ const FIREBASE_CONFIG = {
   storageBucket:"hyperpos-12210.firebasestorage.app",
   messagingSenderId:"641877559339",
   appId:"1:641877559339:web:b95061f96efe5da489026e",
+  measurementId:"G-HLZWW4DRY4",
 };
 
 const COLLECTIONS = {
@@ -1503,6 +1504,8 @@ const Crypto = {
 const CloudDB = {
   ready:false, error:"", app:null, auth:null, db:null, uid:null,
   _initPromise:null, _retryTimer:null, _listenersBound:false,
+  _retryDelay: 8000,        // base delay, doubles each attempt
+  _retryAttempt: 0,         // used for exponential backoff (capped at 5 min)
 
   sdkAvailable(){
     return typeof firebase !== "undefined" && firebase && firebase.initializeApp;
@@ -1521,34 +1524,42 @@ const CloudDB = {
       this._scheduleRetry();
       return false;
     }
+
     try{
+      // 1. Init or reuse the app
       this.app = (firebase.apps && firebase.apps.length)
         ? firebase.app()
         : firebase.initializeApp(FIREBASE_CONFIG);
+
+      // 2. Auth + Firestore handles
       this.auth = firebase.auth();
       this.db   = firebase.firestore();
 
+      // 3. Firestore offline persistence (best effort — safe to fail)
       try{ await this.db.enablePersistence({ synchronizeTabs:true }); }
       catch(e){ console.warn("Persistence not enabled:", e && e.code); }
 
-      if (!this.auth.currentUser){ await this.auth.signInAnonymously(); }
+      // 4. Anonymous sign-in with timeout + friendly errors
+      if (!this.auth.currentUser){
+        await this._signInAnonymous();
+      }
       this.uid = this.auth.currentUser ? this.auth.currentUser.uid : null;
 
+      // 5. Bind auth-state listener exactly once
       if (!this._listenersBound){
         this._listenersBound = true;
         this.auth.onAuthStateChanged(u => {
           const wasReady = this.ready;
           this.uid = u ? u.uid : null;
           if (!u){
-            // Try to re-sign-in anonymously
             this.auth.signInAnonymously().catch(e=>{
               console.warn("Re-auth failed:", e);
               this.ready = false;
-              this.error = "Auth lost: " + (e.message || e);
+              this.error = this._friendlyAuthError(e);
               SyncStatus.set("error", this.error);
             });
           } else if (!wasReady){
-            // We just recovered authentication
+            // Auth recovered — bring the app back online
             this.ready = true;
             this.error = "";
             SyncStatus.set("synced", "Reconnected");
@@ -1559,11 +1570,14 @@ const CloudDB = {
         });
       }
 
+      // Success — reset backoff
       this.ready = true;
       this.error = "";
+      this._retryAttempt = 0;
+      this._retryDelay = 8000;
       return true;
     }catch(e){
-      this.error = (e && (e.code ? e.code + ": " : "") + (e.message || e)) || String(e);
+      this.error = (e && e.message) ? e.message : String(e);
       this.ready = false;
       console.warn("CloudDB init failed:", e);
       this._scheduleRetry();
@@ -1571,32 +1585,121 @@ const CloudDB = {
     }
   },
 
+  /* ── Sign-in with timeout + friendly errors ───────────── */
+  async _signInAnonymous(){
+    const timeoutMs = 15000;
+    try{
+      await Promise.race([
+        this.auth.signInAnonymously(),
+        new Promise((_, rej) => setTimeout(
+          () => rej(Object.assign(
+            new Error("Sign-in timed out — check network / authorized domains."),
+            { code: "app/timeout" }
+          )),
+          timeoutMs
+        )),
+      ]);
+    }catch(err){
+      throw new Error(this._friendlyAuthError(err));
+    }
+  },
+
+  /* Map obscure Firebase codes → actionable messages */
+  _friendlyAuthError(err){
+    const code = (err && err.code) || "";
+    const map = {
+      "auth/operation-not-allowed":
+        "Anonymous sign-in is DISABLED. Open Firebase Console → Authentication → Sign-in method → enable 'Anonymous'.",
+      "auth/network-request-failed":
+        "Network error during sign-in. Check your internet connection.",
+      "auth/unauthorized-domain":
+        "This domain is not authorized. Firebase Console → Authentication → Settings → Authorized domains → add this host.",
+      "auth/api-key-not-valid":
+        "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
+      "auth/invalid-api-key":
+        "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
+      "auth/invalid-app-credential":
+        "Invalid app credential — verify apiKey & appId belong to the same Firebase project.",
+      "auth/app-not-authorized":
+        "This web app is not authorized. Firebase Console → Project Settings → your web app.",
+      "auth/admin-restricted-operation":
+        "Sign-up restricted. Enable Anonymous auth in Firebase Console.",
+      "permission-denied":
+        "Firestore security rules block access. Allow reads/writes for authenticated users.",
+      "unavailable":
+        "Firestore unreachable — check network and Firestore security rules.",
+      "failed-precondition":
+        "Firestore not initialized. Enable Firestore Database in Firebase Console.",
+      "app/timeout":
+        "Sign-in timed out — check network / authorized domains.",
+    };
+    return map[code] || (code ? code + ": " + (err.message || err) : (err.message || String(err)));
+  },
+
+  /* Exponential backoff: 8s, 16s, 32s … capped at 5 min */
   _scheduleRetry(){
     if (this._retryTimer) return;
+    const delay = Math.min(this._retryDelay * Math.pow(2, this._retryAttempt), 300000);
+    this._retryAttempt++;
     this._retryTimer = setTimeout(()=>{
       this._retryTimer = null;
       if (!this.ready){
         this._initPromise = null;
         this.init().then(ok=>{
-          if (ok && typeof Realtime !== "undefined" && typeof DB !== "undefined" && DB.settings && DB.settings.firebase_enabled === "1"){
+          if (ok && typeof Realtime !== "undefined"
+              && typeof DB !== "undefined" && DB.settings
+              && DB.settings.firebase_enabled === "1"){
             try{ Realtime.start(); }catch(e){}
             SyncStatus.set("synced", "Reconnected");
           }
         });
       }
-    }, 8000);
+    }, delay);
   },
 
   col(key){ return this.db.collection(COLLECTIONS[key].name); },
+
   async token(){
     if (this.ready && this.auth && this.auth.currentUser){
       try{ return await this.auth.currentUser.getIdToken(); }catch(e){}
     }
     return null;
   },
+
   printJobsCol(){
     const custom = (DB.settings && DB.settings.firebase_collection_print_jobs) || "print_jobs";
     return custom.trim() || "print_jobs";
+  },
+
+  /* ── Used by Settings → Test connection ────────────────── */
+  async diagnose(){
+    const out = { ok:true, steps:[] };
+    const push = (name, ok, info="")=>{
+      out.steps.push({ name, ok, info });
+      if (!ok) out.ok = false;
+    };
+
+    push("Firebase SDK loaded", this.sdkAvailable(),
+         this.sdkAvailable() ? "" : "Scripts blocked or no internet");
+    if (!this.sdkAvailable()) return out;
+
+    push("App initialized", !!this.app, this.app ? "" : "initializeApp failed");
+    push("Auth instance",  !!this.auth);
+    push("Firestore instance", !!this.db);
+
+    if (this.db){
+      try{
+        await withTimeout(this.db.collection("__diag__").limit(1).get(), 8000);
+        push("Firestore reachable", true, "read ok");
+      }catch(e){
+        push("Firestore reachable", false, (e && e.message) || String(e));
+      }
+    }
+
+    push("Signed in", !!this.uid,
+         this.uid ? "uid=" + this.uid.slice(0,8) : (this.error || "not signed in"));
+
+    return out;
   },
 };
 
@@ -5690,12 +5793,24 @@ const SettingsPage = {
       toast(t("uploading"), "info", 4000);
     });
 
+    /* ── UPDATED: full step-by-step diagnostic test ───────────── */
     $("s-test-fb").addEventListener("click", async ()=>{
-      const res = await FirebaseSync.pushDocument(
-        $("s-fb-orders").value || "orders",
-        { test:true, message:"Hello from Pizza POS", created_at: nowIso() });
-      if (res.ok) toast(`OK (${res.info})`, "success");
-      else toast("Failed: " + res.info, "error", 6000);
+      const diag = await CloudDB.diagnose();
+      const lines = diag.steps.map(s =>
+        (s.ok ? "✅ " : "❌ ") + s.name + (s.info ? "  —  " + s.info : "")
+      ).join("\n");
+
+      // Echo into the on-screen diagnostics panel too
+      const el = $("s-diag-sync");
+      if (el) el.textContent = lines;
+
+      if (diag.ok){
+        toast("Cloud connection OK", "success");
+      } else {
+        // Show the first failing step in a modal so it's impossible to miss
+        const bad = diag.steps.find(s => !s.ok);
+        toast("Failed: " + (bad ? bad.name + " — " + bad.info : "unknown"), "error", 8000);
+      }
       refreshAll();
     });
 
