@@ -696,7 +696,13 @@ const I18N = {
     line_items_edit: "Line items",
     payment_method: "Payment method",
     add_line: "+ Add line",
-
+    reset_day_counter: "🔄 Reset Day Counter",
+    reset_day_counter_q: "Reset the order number counter for today?\n\nNew orders will start again at #0001.",
+    day_counter_reset: "Day counter reset ✓",
+    reset_counter_after_cc: "Also reset the day counter after printing Close Cash",
+        close_cash_hint: "Printing Close Cash closes the day: the report is printed and a new day starts — the next order will be #0001.",
+    day_closed: "Day closed — new day started, next order will be #0001",
+    delivery_fees: "Delivery fees",
     settings: "Settings",
     install_pwa: "📲  Install as an App (PWA)",
     install_pwa_hint: "Install Pizza POS on this phone so it opens full-screen like a native app and keeps working when the network drops.",
@@ -971,6 +977,13 @@ const I18N = {
     line_items_edit: "بنود الطلب",
     payment_method: "طريقة الدفع",
     add_line: "+ إضافة بند",
+    reset_day_counter: "🔄 تصفير عدّاد اليوم",
+    reset_day_counter_q: "هل تريد تصفير عدّاد أرقام الطلبات لليوم؟\n\nستبدأ الطلبات الجديدة من #0001.",
+    day_counter_reset: "تم تصفير عدّاد اليوم ✓",
+    reset_counter_after_cc: "أيضاً صفّر عدّاد اليوم بعد طباعة إغلاق الصندوق",
+	close_cash_hint: "طباعة إغلاق الصندوق تُغلق اليوم: يُطبع التقرير ويبدأ يوم جديد — الطلب التالي سيكون #0001.",
+    day_closed: "تم إغلاق اليوم — بدأ يوم جديد، الطلب التالي سيكون #0001",
+    delivery_fees: "رسوم التوصيل",
 
     settings: "الإعدادات",
     install_pwa: "📲  التثبيت كتطبيق (PWA)",
@@ -1274,6 +1287,8 @@ const DEFAULT_SETTINGS = {
 
   options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1", order_v1:"1",
   listener_v1:"1", lang_v1:"1", reset_v1:"1", delivery_v1:"1",
+  wings_flavor_v1:"1",
+  day_start_iso:"",
 };
 
 const DEVICE_LOCAL_SETTING_KEYS = ["printer_mode", "printer_store_listener"];
@@ -1295,6 +1310,7 @@ const SEED_PRODUCTS = [
   ["Soft Drink","🥤","Drinks",0,55000,120,1,1],
 ];
 
+/* CHICKEN WINGS now has a Flavor group (Barbecue / Buffalo) */
 const CUSTOM_OPTIONS = {
   "Cheese Garlic Fingers":[
     { name:"Size", multi:false, choices:[
@@ -1314,7 +1330,11 @@ const CUSTOM_OPTIONS = {
       { label:"12 pcs",         price: 600000 },
       { label:"12 pcs + Fries", price: 800000 },
       { label:"24 pcs",         price:1100000 },
-    ]}
+    ]},
+    { name:"Flavor", multi:true, max_choices:2, choices:[
+      { label:"Barbecue", price:0 },
+      { label:"Buffalo",  price:0 },
+    ]},
   ],
   "Chicken Strips":[
     { name:"Portion", multi:false, choices:[
@@ -1944,6 +1964,7 @@ const DB = {
     this.settings.lang_v1 = "1";
     this.settings.reset_v1 = "1";
     this.settings.delivery_v1 = "1";
+    this.settings.wings_flavor_v1 = "1";
     try{
       const opts = JSON.parse(this.settings.product_options);
       this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
@@ -2039,6 +2060,32 @@ const DB = {
       this.settings.delivery_v1 = "1";
       changed = true;
     }
+
+    /* ─── Chicken Wings: add Flavor group (Barbecue / Buffalo) ─── */
+    if (this.settings.wings_flavor_v1 !== "1"){
+      const wings = this.products.find(x => x.name === "Chicken Wings");
+      if (wings){
+        let groups = [];
+        try{ groups = JSON.parse(wings.custom_options || "[]"); }catch(e){ groups = []; }
+        if (!Array.isArray(groups) || !groups.length){
+          groups = cloneJson(CUSTOM_OPTIONS["Chicken Wings"]);
+        } else if (!groups.some(g => g && g.name === "Flavor")){
+          groups.push({
+            name:"Flavor", multi:true, max_choices:2,
+            choices:[
+              { label:"Barbecue", price:0 },
+              { label:"Buffalo",  price:0 },
+            ],
+          });
+        }
+        wings.custom_options = JSON.stringify(groups);
+        wings.has_options = 1;
+        Persist.put("products", wings);
+      }
+      this.settings.wings_flavor_v1 = "1";
+      changed = true;
+    }
+
     for (const k in DEFAULT_SETTINGS){
       if (!(k in this.settings)){ this.settings[k] = DEFAULT_SETTINGS[k]; changed = true; }
     }
@@ -2154,13 +2201,24 @@ const DB = {
     Persist.remove("customers", id);
   },
 
+  /* ── ORDER NUMBER COUNTER — respects day_start_iso (reset point) ── */
   nextOrderNo(){
     const d = new Date();
     const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
     const pref = `ORD-${day}-`;
+    const startIso = this.settings.day_start_iso || "";
     let n = 0;
-    for (const o of this.orders){ if (o.order_no && o.order_no.startsWith(pref)) n++; }
+    for (const o of this.orders){
+      if (!o.order_no || !o.order_no.startsWith(pref)) continue;
+      if (startIso && (o.created_at || "") < startIso) continue;
+      n++;
+    }
     return pref + String(n+1).padStart(4,"0");
+  },
+  resetDayCounter(){
+    this.settings.day_start_iso = nowIso();
+    this.save("settings");
+    Persist.putObject("settings", this.settings);
   },
   _freeOrderNo(no){
     if (!this.orders.some(o => o.order_no === no)) return no;
@@ -2256,7 +2314,6 @@ const DB = {
   },
   /* ─────────── REPORT ORDER EDIT / DELETE ─────────── */
 
-  /* Update the header fields of an existing order. */
   updateOrder(id, patch){
     const row = this.orders.find(x=>x.id === id);
     if (!row) return false;
@@ -2266,7 +2323,6 @@ const DB = {
     return true;
   },
 
-  /* Replace every line item of an order (old lines are deleted everywhere). */
   replaceOrderItems(orderId, items){
     const old = this.order_items.filter(i => i.order_id === orderId);
     this.order_items = this.order_items.filter(i => i.order_id !== orderId);
@@ -2278,7 +2334,6 @@ const DB = {
     this.save("order_items");
   },
 
-  /* Permanently delete a paid order and optionally return its items to stock. */
   deletePaidOrder(id, opts){
     opts = opts || {};
     const row = this.orders.find(x=>x.id === id);
@@ -2354,8 +2409,6 @@ const DB = {
       (o.created_at||"").slice(0,10) >= s &&
       (o.created_at||"").slice(0,10) <= e);
   },
-  /* Paid orders in range with their line items attached — used by
-     the Reports orders list and the detailed Close-Cash printer. */
   paidOrdersWithItems(s, e){
     return this._paidOrdersInRange(s, e)
       .map(o => Object.assign({}, o, {
@@ -2886,7 +2939,6 @@ function buildEscPosBody(order, settings, copyLabel){
   return p.bytes();
 }
 
-/* Cut FIRST, then kick drawer AFTER */
 function buildEscPosCut(settings, opts){
   opts = opts || {};
   const mode = settings.printer_cut || "partial";
@@ -2902,10 +2954,7 @@ function buildEscPosReceipt(order, settings, copyLabel){
 }
 
 /* ───────────────────────────────────────────────────────────────
-   CLOSE-CASH report — DETAILED invoice-style.
-   Every cash order is expanded with its line items:
-     name • qty × unit ........ line total
-   Then a full expense list, then the drawer summary.
+   CLOSE-CASH report — now with SALES BY CATEGORY.
    ─────────────────────────────────────────────────────────────── */
 function buildCloseCashText(start, end, settings){
   const sym = settings.currency_symbol || "LBP ";
@@ -2922,8 +2971,12 @@ function buildCloseCashText(start, end, settings){
   lines.push(sep("="));
 
   /* ── CASH ORDERS — full invoice detail per order ── */
-  const cashOrders = DB.paidOrdersWithItems(start, end)
-    .filter(o => o.payment_method === "Cash");
+  const allOrders  = DB.paidOrdersWithItems(start, end);
+  const cashOrders = allOrders.filter(o => o.payment_method === "Cash");
+
+  let deliveryCash = 0;
+  let deliveryAll  = 0;
+  for (const o of allOrders) deliveryAll += Number(o.delivery || 0);
 
   lines.push("");
   lines.push("CASH ORDERS (" + cashOrders.length + ")");
@@ -2964,13 +3017,55 @@ function buildCloseCashText(start, end, settings){
           fmtMoney(it.line_total, sym)
         ));
       }
+      const dv = Number(o.delivery || 0);
+      if (dv > 0){
+        deliveryCash += dv;
+        lines.push(lr("  Delivery fee", fmtMoney(dv, sym)));
+      }
       lines.push(lr("  Order total", fmtMoney(o.total, sym)));
     }
 
     lines.push(sep("-"));
     lines.push(lr("Total line items", String(grandLines)));
     lines.push(lr("Total qty",        String(grandItems)));
+    lines.push(lr("Delivery fees",    fmtMoney(deliveryCash, sym)));
     lines.push(lr("Cash sales",       fmtMoney(cash.cash_sales, sym)));
+    lines.push(sep("="));
+  }
+
+  /* ── SALES BY CATEGORY (grouped) ── */
+  const catMap = new Map();
+  for (const o of cashOrders){
+    for (const it of (o.items || [])){
+      const p = it.product_id != null ? DB.getProduct(it.product_id) : null;
+      const c = p ? DB.categories.find(x => x.id === p.category_id) : null;
+      const key = c ? c.name : "Other";
+      if (!catMap.has(key)) catMap.set(key, { name:key, qty:0, revenue:0 });
+      const r = catMap.get(key);
+      r.qty     += Number(it.qty || 0);
+      r.revenue += Number(it.line_total || 0);
+    }
+  }
+  const catRows = [...catMap.values()].sort((a,b) => b.revenue - a.revenue);
+  const catTotalQty = catRows.reduce((a,x)=>a+x.qty, 0);
+  const catTotalRev = catRows.reduce((a,x)=>a+x.revenue, 0);
+
+  lines.push("");
+  lines.push("SALES BY CATEGORY");
+  lines.push(sep("="));
+  if (!catRows.length){
+    lines.push("  (none)");
+    lines.push(sep("-"));
+  } else {
+    lines.push(lr("Category", "Qty / Revenue"));
+    lines.push(sep("-"));
+    for (const r of catRows){
+      const left  = "  " + r.name;
+      const right = r.qty + " / " + fmtMoney(r.revenue, sym);
+      lines.push(lr(left, right));
+    }
+    lines.push(sep("-"));
+    lines.push(lr("  TOTAL", catTotalQty + " / " + fmtMoney(catTotalRev, sym)));
     lines.push(sep("="));
   }
 
@@ -2996,11 +3091,13 @@ function buildCloseCashText(start, end, settings){
     lines.push(sep("="));
   }
 
-  /* ── Drawer summary ── */
+  /* ── Drawer summary (with delivery fees) ── */
   lines.push("");
-  lines.push(lr("CASH ORDERS", String(cash.cash_orders)));
-  lines.push(lr("CASH SALES",  fmtMoney(cash.cash_sales, sym)));
-  lines.push(lr("EXPENSES",    fmtMoney(cash.expenses,   sym)));
+  lines.push(lr("CASH ORDERS",  String(cash.cash_orders)));
+  lines.push(lr("CASH SALES",   fmtMoney(cash.cash_sales, sym)));
+  lines.push(lr("  of which delivery fees", fmtMoney(deliveryCash, sym)));
+  lines.push(lr("DELIVERY FEES (all orders)", fmtMoney(deliveryAll, sym)));
+  lines.push(lr("EXPENSES",     fmtMoney(cash.expenses,   sym)));
   lines.push(sep("="));
   lines.push(lr("EXPECTED DRAWER", fmtMoney(cash.expected, sym)));
 
@@ -3009,6 +3106,11 @@ function buildCloseCashText(start, end, settings){
   const secSym = sec === "USD" ? "$" : sec + " ";
   if (rate) lines.push(center(secSym + (cash.expected/rate).toFixed(2) + "  @ " + rate.toFixed(0)));
   lines.push(sep("="));
+
+  /* ── Day closed marker ── */
+  lines.push("");
+  lines.push(center("*** DAY CLOSED ***"));
+  lines.push(center("Next order: #0001"));
   lines.push("");
   lines.push(lr("Opened by", "________________"));
   lines.push(lr("Closed by", "________________"));
@@ -4171,6 +4273,7 @@ const POSPage = {
         let hint;
         if (isExtras) hint = ` <span class="faint">(optional · tap to toggle)</span>`;
         else if (isFlavor && largeOnly) hint = ` <span class="faint">(optional · choose 1 or 2)</span>`;
+        else if (isFlavor) hint = ` <span class="faint">(optional · choose 1 or 2)</span>`;
         else if (grp.multi && grp.max_choices) hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
         else if (grp.multi) hint = " <span class='faint'>(multiple)</span>";
         else hint = "";
@@ -4231,7 +4334,9 @@ const POSPage = {
           } else if (g === "Flavor"){
             if (state.flavorSet.has(l)) state.flavorSet.delete(l);
             else {
-              if (state.flavorSet.size >= 2) state.flavorSet.delete(state.flavorSet.values().next().value);
+              const grp = groups.find(x => x.name === "Flavor");
+              const maxC = (grp && Number(grp.max_choices)) || 2;
+              if (state.flavorSet.size >= maxC) state.flavorSet.delete(state.flavorSet.values().next().value);
               state.flavorSet.add(l);
             }
           } else {
@@ -5643,11 +5748,14 @@ const ReportsPage = {
         <h3>${escapeHtml(t("recent_orders"))}</h3>
         <div class="orders-list" id="rep-orders"></div>
       </div>
-      <div class="card" style="padding:14px;">
+        <div class="card" style="padding:14px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <h3 style="flex:1; min-width:120px;">${escapeHtml(t("close_cash"))}</h3>
           <button class="btn primary" id="rep-print-cc">${escapeHtml(t("print_close_cash"))}</button>
           <button class="btn ghost" id="rep-sync-cc">${escapeHtml(t("sync_to_firebase"))}</button>
+        </div>
+        <div class="faint" style="font-size:11px; margin-top:10px; line-height:1.6;">
+          ${escapeHtml(t("close_cash_hint"))}
         </div>
         <div class="muted" id="rep-cc-info" style="margin-top:8px;"></div>
       </div>
@@ -5686,15 +5794,27 @@ const ReportsPage = {
         this.render();
       });
     });
+
+    /* Print Close Cash — optionally reset the day counter afterwards. */
     document.getElementById("rep-print-cc").addEventListener("click", async ()=>{
       const text = buildCloseCashText(this.from, this.to, DB.settings);
-      await Printer.printText(text, DB.settings);
+      const res = await Printer.printText(text, DB.settings);
+      const chk = document.getElementById("rep-cc-reset");
+      if (chk && chk.checked && (!res || res.ok !== false)){
+        DB.resetDayCounter();
+        toast(t("day_counter_reset"), "success");
+      }
     });
     document.getElementById("rep-sync-cc").addEventListener("click", async ()=>{
       if (DB.settings.firebase_enabled !== "1"){ toast(t("cloud_sync_first"), "warning"); return; }
       const res = await CloudSync.pushCloseCash(this.from, this.to);
       if (res.ok) toast(t("close_cash_synced"), "success");
       else toast(t("firebase_sync_failed") + res.info, "error", 5000);
+    });
+    document.getElementById("rep-reset-counter").addEventListener("click", ()=>{
+      if (!confirm(t("reset_day_counter_q"))) return;
+      DB.resetDayCounter();
+      toast(t("day_counter_reset"), "success");
     });
     document.getElementById("rep-reset").addEventListener("click", ()=>{
       ResetReports.open(()=>{
@@ -5743,8 +5863,7 @@ const ReportsPage = {
     if (tDays) tDays.innerHTML = DB.salesByDay(s,e).map(r=>
       `<tr><td>${escapeHtml(r.day)}</td><td>${r.orders}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
 
-    /* ── Recent Orders list — click a row (or any icon) to view,
-       reprint, EDIT or DELETE the order. ── */
+    /* ── Recent Orders list — edit / delete / reprint. ── */
     const ordersEl = document.getElementById("rep-orders");
     if (ordersEl){
       const orders = DB.paidOrdersWithItems(s, e);
@@ -5815,7 +5934,6 @@ const ReportsPage = {
     ReceiptDialog.show(snap);
   },
 
-  /* Open the full order editor (customer, payment, line items, totals). */
   _editOrder(orderId){
     OrderEditor.open(orderId, ()=>{
       this.render();
@@ -5827,7 +5945,6 @@ const ReportsPage = {
     });
   },
 
-  /* Permanently delete the order and return its items to stock. */
   _deleteOrder(orderId){
     const o = DB.orders.find(x=>x.id === orderId);
     if (!o){ toast("Order not found", "error"); return; }
