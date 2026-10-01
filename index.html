@@ -51,7 +51,6 @@ input,select,textarea,button{font-size:13px;}
 .btn.chip.active{background:var(--primary); color:var(--on-primary); border-color:var(--primary);}
 .btn.icon{background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 10px;}
 
-/* ── Text inputs / selects / textareas (checkboxes excluded) ───────── */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea{
@@ -68,9 +67,6 @@ body.dark select:focus,
 body.dark textarea:focus{ box-shadow:0 0 0 3px rgba(248,250,252,.10); }
 textarea{resize:vertical; font-family:inherit;}
 
-/* ═══════════════════════════════════════════════════════════════
-   REAL-LOOKING CHECKBOXES & RADIOS
-   ═══════════════════════════════════════════════════════════════ */
 input[type="checkbox"],
 input[type="radio"]{
   -webkit-appearance:none; appearance:none;
@@ -89,56 +85,31 @@ input[type="radio"]{
   transition:background .15s, border-color .15s, box-shadow .15s, transform .1s;
 }
 input[type="radio"]{ border-radius:50%; }
-
 input[type="checkbox"]:hover:not(:disabled),
 input[type="radio"]:hover:not(:disabled){ border-color:var(--text3); }
-
 input[type="checkbox"]:active:not(:disabled),
 input[type="radio"]:active:not(:disabled){ transform:scale(.92); }
-
 input[type="checkbox"]:focus-visible,
 input[type="radio"]:focus-visible{
-  outline:none;
-  border-color:var(--primary);
+  outline:none; border-color:var(--primary);
   box-shadow:0 0 0 3px rgba(15,23,42,.18);
 }
 body.dark input[type="checkbox"]:focus-visible,
-body.dark input[type="radio"]:focus-visible{
-  box-shadow:0 0 0 3px rgba(248,250,252,.22);
-}
-
-/* Checked state — filled box with a crisp white checkmark */
-input[type="checkbox"]:checked{
-  background:var(--primary);
-  border-color:var(--primary);
-}
+body.dark input[type="radio"]:focus-visible{ box-shadow:0 0 0 3px rgba(248,250,252,.22); }
+input[type="checkbox"]:checked{ background:var(--primary); border-color:var(--primary); }
 input[type="checkbox"]:checked::after{
-  content:"";
-  width:5px; height:10px;
+  content:""; width:5px; height:10px;
   border:solid var(--on-primary);
   border-width:0 2.5px 2.5px 0;
   transform:rotate(45deg) translate(-1px,-1px);
   margin-top:-2px;
 }
-
-/* Checked state — filled radio dot */
-input[type="radio"]:checked{
-  border-color:var(--primary);
-  background:var(--surface);
-}
+input[type="radio"]:checked{ border-color:var(--primary); background:var(--surface); }
 input[type="radio"]:checked::after{
-  content:"";
-  width:10px; height:10px;
-  border-radius:50%;
-  background:var(--primary);
+  content:""; width:10px; height:10px; border-radius:50%; background:var(--primary);
 }
-
 input[type="checkbox"]:disabled,
-input[type="radio"]:disabled{
-  opacity:.45; cursor:not-allowed;
-}
-
-/* Checkbox label rows -------------------------------------------------- */
+input[type="radio"]:disabled{ opacity:.45; cursor:not-allowed; }
 label > input[type="checkbox"],
 label > input[type="radio"]{ pointer-events:auto; }
 
@@ -324,6 +295,18 @@ html[dir="rtl"] .tabs-bar .tab-del{margin-left:0; margin-right:6px;}
 .report-box{padding:12px; max-height:340px; overflow:auto;}
 .report-box h3{margin-bottom:8px;}
 
+.orders-list{max-height:420px; overflow:auto;}
+.order-item{display:flex; align-items:center; gap:10px; padding:9px 10px;
+  border:1px solid var(--border); border-radius:10px; margin-bottom:6px;
+  background:var(--surface2); cursor:pointer; transition:background .12s, border-color .12s;}
+.order-item:hover{background:var(--surface3); border-color:var(--text3);}
+.order-item .ono{font-weight:800; font-size:12px; white-space:nowrap;}
+.order-item .ocust{flex:1; min-width:0; font-size:12px; color:var(--text2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.order-item .otime{font-size:10px; color:var(--text3); white-space:nowrap;}
+.order-item .ototal{font-weight:800; font-size:12px; white-space:nowrap;}
+.order-item .oact{display:flex; gap:4px;}
+
 #toasts{position:fixed; bottom:20px; right:20px; z-index:300;
   display:flex; flex-direction:column; gap:8px; align-items:flex-end;
   pointer-events:none; max-width:calc(100vw - 40px);}
@@ -408,7 +391,6 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 .danger-warn{background:rgba(239,68,68,.08); border-left:3px solid var(--danger);
   padding:10px 12px; border-radius:10px; margin-bottom:12px; font-size:12px; line-height:1.6;}
 
-/* ── Held-orders rows ─────────────────────────────────── */
 .held-row{display:flex; align-items:center; gap:10px; padding:10px;
   border:1px solid var(--border); border-radius:12px; margin-bottom:8px;
   background:var(--surface2); transition:background .12s;}
@@ -421,9 +403,6 @@ body.dark .cart-fab .count{background:rgba(0,0,0,.25);}
 .held-row.current{border-color:var(--primary); background:var(--surface);}
 .held-empty{padding:30px 20px; text-align:center; color:var(--text3); font-size:12px;}
 
-/* ═══════════════════════════════════════════════════════════════
-   ARABIC / RTL SUPPORT
-   ═══════════════════════════════════════════════════════════════ */
 html[dir="rtl"] body{font-family:'Noto Kufi Arabic','Noto Naskh Arabic','Tahoma','Arial',
   'Inter','Segoe UI',sans-serif;}
 html[dir="rtl"] .sidebar{border-right:none; border-left:1px solid var(--border);}
@@ -701,6 +680,13 @@ const I18N = {
     cloud_sync_first: "Enable Cloud Sync in Settings first",
     close_cash_synced: "Close Cash synced to Firebase",
     firebase_sync_failed: "Firebase sync failed: ",
+    recent_orders: "📋 Recent Orders",
+    reprint: "Reprint",
+    view_receipt: "View / Reprint receipt",
+    no_orders_in_range: "No orders in the selected range.",
+    order_detail: "Order Detail",
+    line_items: "Line Items",
+    no_items: "No items.",
 
     settings: "Settings",
     install_pwa: "📲  Install as an App (PWA)",
@@ -736,7 +722,7 @@ const I18N = {
     printer_name: "Printer name",
     copies: "Copies", cut: "Cut",
     cut_every_copy: "✂  Cut the paper after every copy (not only after the last one)",
-    kick_drawer: "Kick cash drawer on print",
+    kick_drawer: "Kick cash drawer on print (after receipt)",
     auto_print: "Auto-print after payment",
     agent_url: "Print Agent URL",
     agent_token: "Agent token (optional)",
@@ -813,6 +799,8 @@ const I18N = {
     paid: "Paid ",
 
     receipt: "🧾  Receipt",
+    edit_receipt_hint: "You can edit the text below before printing — the receipt will print exactly as shown.",
+    reset_receipt: "Reset",
     mode: "Mode", cut_each: "Cut each copy", drawer: "Drawer", listener: "Listener",
     print_job_sent: "Print job sent",
 
@@ -834,6 +822,13 @@ const I18N = {
     printing: "Printing…",
     printing_ok: "Printed",
     printing_fail: "Print failed",
+
+    device_role: "Device role",
+    device_role_hint: "Store devices keep the physical printer and listen for remote jobs. Remote devices send jobs to the store through the cloud. Stored locally — never synced.",
+    role_store: "Store device",
+    role_remote: "Remote device",
+    role_store_applied: "Store role applied — listener ON, browser printer",
+    role_remote_applied: "Remote role applied — cloud printer, listener OFF",
   },
 
   ar: {
@@ -951,6 +946,13 @@ const I18N = {
     cloud_sync_first: "فعّل المزامنة السحابية من الإعدادات أولاً",
     close_cash_synced: "تمت مزامنة إغلاق الصندوق مع Firebase",
     firebase_sync_failed: "فشلت مزامنة Firebase: ",
+    recent_orders: "📋 أحدث الطلبات",
+    reprint: "إعادة طباعة",
+    view_receipt: "عرض / إعادة طباعة الفاتورة",
+    no_orders_in_range: "لا توجد طلبات في النطاق المحدد.",
+    order_detail: "تفاصيل الطلب",
+    line_items: "بنود الطلب",
+    no_items: "لا توجد بنود.",
 
     settings: "الإعدادات",
     install_pwa: "📲  التثبيت كتطبيق (PWA)",
@@ -986,7 +988,7 @@ const I18N = {
     printer_name: "اسم الطابعة",
     copies: "النسخ", cut: "القطع",
     cut_every_copy: "✂  اقطع الورق بعد كل نسخة (وليس فقط الأخيرة)",
-    kick_drawer: "فتح درج النقود عند الطباعة",
+    kick_drawer: "فتح درج النقود عند الطباعة (بعد الإيصال)",
     auto_print: "طباعة تلقائية بعد الدفع",
     agent_url: "رابط وكيل الطباعة",
     agent_token: "رمز الوكيل (اختياري)",
@@ -1063,6 +1065,8 @@ const I18N = {
     paid: "تم الدفع ",
 
     receipt: "🧾  الإيصال",
+    edit_receipt_hint: "يمكنك تعديل النص أدناه قبل الطباعة — ستُطبع الفاتورة كما تظهر تماماً.",
+    reset_receipt: "إعادة تعيين",
     mode: "الوضع", cut_each: "القطع بعد كل نسخة", drawer: "الدرج", listener: "المستمع",
     print_job_sent: "تم إرسال مهمة الطباعة",
 
@@ -1084,6 +1088,13 @@ const I18N = {
     printing: "جارٍ الطباعة…",
     printing_ok: "تمت الطباعة",
     printing_fail: "فشلت الطباعة",
+
+    device_role: "دور الجهاز",
+    device_role_hint: "أجهزة المتجر تحتفظ بالطابعة الفعلية وتستمع للمهام البعيدة. الأجهزة البعيدة ترسل المهام عبر السحابة. يُحفظ محلياً — لا تتم مزامنته.",
+    role_store: "جهاز المتجر",
+    role_remote: "جهاز بعيد",
+    role_store_applied: "تم تطبيق دور المتجر — المستمع مفعّل، طابعة المتصفح",
+    role_remote_applied: "تم تطبيق الدور البعيد — طابعة سحابية، المستمع متوقف",
   }
 };
 
@@ -1181,10 +1192,7 @@ const COLLECTIONS = {
 const COLLECTION_KEYS = Object.keys(COLLECTIONS);
 
 const CHICKEN_BBQ_LARGE_PRICE = 1_200_000;
-
-/* Delivery fee presets. First entry (0) is the default = NO FEES. */
 const DELIVERY_FEE_PRESETS = [0, 100000, 200000, 300000, 500000];
-
 const EXTRAS_GROUP_NAME = "Extras";
 const EXTRAS_CHOICES = [
   { label:"Without Olive",    price:0 },
@@ -1249,6 +1257,8 @@ const DEFAULT_SETTINGS = {
   options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1", order_v1:"1",
   listener_v1:"1", lang_v1:"1", reset_v1:"1", delivery_v1:"1",
 };
+
+const DEVICE_LOCAL_SETTING_KEYS = ["printer_mode", "printer_store_listener"];
 
 const SEED_CATEGORIES = ["Pizza","Sides","Chicken","Drinks"];
 
@@ -1410,7 +1420,6 @@ function deliveryFeeChoices(){
   return [...set].sort((a,b)=>a-b);
 }
 function defaultDeliveryFee(){ return 0; }
-
 function t(key, params){ return I18n.t(key, params); }
 
 /* ═══════════════════ TOAST ═══════════════════ */
@@ -1497,26 +1506,20 @@ const Crypto = {
   },
 };
 
-/* ═══════════════════ CLOUD DATABASE (Firestore SDK) ═══════════════════
-   Handles the SHARED real-time database — keeps all devices in sync:
-   products, orders, sales, customers, expenses, stock and settings.
-   Retries on failure and auto-reconnects when the network comes back. */
+/* ═══════════════════ CLOUD DATABASE ═══════════════════ */
 const CloudDB = {
   ready:false, error:"", app:null, auth:null, db:null, uid:null,
   _initPromise:null, _retryTimer:null, _listenersBound:false,
-  _retryDelay: 8000,        // base delay, doubles each attempt
-  _retryAttempt: 0,         // used for exponential backoff (capped at 5 min)
+  _retryDelay: 8000, _retryAttempt: 0,
 
   sdkAvailable(){
     return typeof firebase !== "undefined" && firebase && firebase.initializeApp;
   },
-
   init(){
     if (this._initPromise) return this._initPromise;
     this._initPromise = this._doInit();
     return this._initPromise;
   },
-
   async _doInit(){
     if (!this.sdkAvailable()){
       this.error = "Firebase SDK not loaded (no internet on first load?)";
@@ -1524,28 +1527,16 @@ const CloudDB = {
       this._scheduleRetry();
       return false;
     }
-
     try{
-      // 1. Init or reuse the app
       this.app = (firebase.apps && firebase.apps.length)
         ? firebase.app()
         : firebase.initializeApp(FIREBASE_CONFIG);
-
-      // 2. Auth + Firestore handles
       this.auth = firebase.auth();
       this.db   = firebase.firestore();
-
-      // 3. Firestore offline persistence (best effort — safe to fail)
       try{ await this.db.enablePersistence({ synchronizeTabs:true }); }
       catch(e){ console.warn("Persistence not enabled:", e && e.code); }
-
-      // 4. Anonymous sign-in with timeout + friendly errors
-      if (!this.auth.currentUser){
-        await this._signInAnonymous();
-      }
+      if (!this.auth.currentUser){ await this._signInAnonymous(); }
       this.uid = this.auth.currentUser ? this.auth.currentUser.uid : null;
-
-      // 5. Bind auth-state listener exactly once
       if (!this._listenersBound){
         this._listenersBound = true;
         this.auth.onAuthStateChanged(u => {
@@ -1559,7 +1550,6 @@ const CloudDB = {
               SyncStatus.set("error", this.error);
             });
           } else if (!wasReady){
-            // Auth recovered — bring the app back online
             this.ready = true;
             this.error = "";
             SyncStatus.set("synced", "Reconnected");
@@ -1569,8 +1559,6 @@ const CloudDB = {
           }
         });
       }
-
-      // Success — reset backoff
       this.ready = true;
       this.error = "";
       this._retryAttempt = 0;
@@ -1584,8 +1572,6 @@ const CloudDB = {
       return false;
     }
   },
-
-  /* ── Sign-in with timeout + friendly errors ───────────── */
   async _signInAnonymous(){
     const timeoutMs = 15000;
     try{
@@ -1603,40 +1589,24 @@ const CloudDB = {
       throw new Error(this._friendlyAuthError(err));
     }
   },
-
-  /* Map obscure Firebase codes → actionable messages */
   _friendlyAuthError(err){
     const code = (err && err.code) || "";
     const map = {
-      "auth/operation-not-allowed":
-        "Anonymous sign-in is DISABLED. Open Firebase Console → Authentication → Sign-in method → enable 'Anonymous'.",
-      "auth/network-request-failed":
-        "Network error during sign-in. Check your internet connection.",
-      "auth/unauthorized-domain":
-        "This domain is not authorized. Firebase Console → Authentication → Settings → Authorized domains → add this host.",
-      "auth/api-key-not-valid":
-        "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
-      "auth/invalid-api-key":
-        "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
-      "auth/invalid-app-credential":
-        "Invalid app credential — verify apiKey & appId belong to the same Firebase project.",
-      "auth/app-not-authorized":
-        "This web app is not authorized. Firebase Console → Project Settings → your web app.",
-      "auth/admin-restricted-operation":
-        "Sign-up restricted. Enable Anonymous auth in Firebase Console.",
-      "permission-denied":
-        "Firestore security rules block access. Allow reads/writes for authenticated users.",
-      "unavailable":
-        "Firestore unreachable — check network and Firestore security rules.",
-      "failed-precondition":
-        "Firestore not initialized. Enable Firestore Database in Firebase Console.",
-      "app/timeout":
-        "Sign-in timed out — check network / authorized domains.",
+      "auth/operation-not-allowed": "Anonymous sign-in is DISABLED. Firebase Console → Authentication → Sign-in method → enable 'Anonymous'.",
+      "auth/network-request-failed": "Network error during sign-in. Check your internet connection.",
+      "auth/unauthorized-domain": "This domain is not authorized. Firebase Console → Authentication → Settings → Authorized domains → add this host.",
+      "auth/api-key-not-valid": "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
+      "auth/invalid-api-key": "Invalid API key. Check FIREBASE_CONFIG.apiKey.",
+      "auth/invalid-app-credential": "Invalid app credential — verify apiKey & appId belong to the same Firebase project.",
+      "auth/app-not-authorized": "This web app is not authorized. Firebase Console → Project Settings → your web app.",
+      "auth/admin-restricted-operation": "Sign-up restricted. Enable Anonymous auth in Firebase Console.",
+      "permission-denied": "Firestore security rules block access. Allow reads/writes for authenticated users.",
+      "unavailable": "Firestore unreachable — check network and Firestore security rules.",
+      "failed-precondition": "Firestore not initialized. Enable Firestore Database in Firebase Console.",
+      "app/timeout": "Sign-in timed out — check network / authorized domains.",
     };
     return map[code] || (code ? code + ": " + (err.message || err) : (err.message || String(err)));
   },
-
-  /* Exponential backoff: 8s, 16s, 32s … capped at 5 min */
   _scheduleRetry(){
     if (this._retryTimer) return;
     const delay = Math.min(this._retryDelay * Math.pow(2, this._retryAttempt), 300000);
@@ -1656,37 +1626,29 @@ const CloudDB = {
       }
     }, delay);
   },
-
   col(key){ return this.db.collection(COLLECTIONS[key].name); },
-
   async token(){
     if (this.ready && this.auth && this.auth.currentUser){
       try{ return await this.auth.currentUser.getIdToken(); }catch(e){}
     }
     return null;
   },
-
   printJobsCol(){
     const custom = (DB.settings && DB.settings.firebase_collection_print_jobs) || "print_jobs";
     return custom.trim() || "print_jobs";
   },
-
-  /* ── Used by Settings → Test connection ────────────────── */
   async diagnose(){
     const out = { ok:true, steps:[] };
     const push = (name, ok, info="")=>{
       out.steps.push({ name, ok, info });
       if (!ok) out.ok = false;
     };
-
     push("Firebase SDK loaded", this.sdkAvailable(),
          this.sdkAvailable() ? "" : "Scripts blocked or no internet");
     if (!this.sdkAvailable()) return out;
-
     push("App initialized", !!this.app, this.app ? "" : "initializeApp failed");
     push("Auth instance",  !!this.auth);
     push("Firestore instance", !!this.db);
-
     if (this.db){
       try{
         await withTimeout(this.db.collection("__diag__").limit(1).get(), 8000);
@@ -1695,22 +1657,19 @@ const CloudDB = {
         push("Firestore reachable", false, (e && e.message) || String(e));
       }
     }
-
     push("Signed in", !!this.uid,
          this.uid ? "uid=" + this.uid.slice(0,8) : (this.error || "not signed in"));
-
     return out;
   },
 };
 
-/* ═══════════════════ PERSISTENCE LAYER ═══════════════════ */
+/* ═══════════════════ PERSISTENCE ═══════════════════ */
 const Persist = {
   _chain: Promise.resolve(),
   _queue(fn){
     this._chain = this._chain.then(fn).catch(e=>{
       console.warn("Persist error:", e);
       SyncStatus.set("error", String((e && e.message) || e));
-      // Retry once after a short delay
       setTimeout(()=>{ this._chain = this._chain.then(fn).catch(()=>{}); }, 4000);
     });
     return this._chain;
@@ -1727,7 +1686,11 @@ const Persist = {
   putObject(coll, obj){
     this.cache(coll);
     if (!CloudDB.ready) return;
-    const data = sanitize(obj || {});
+    let data = sanitize(obj || {});
+    if (coll === "settings"){
+      data = Object.assign({}, data);
+      for (const k of DEVICE_LOCAL_SETTING_KEYS) delete data[k];
+    }
     this._queue(()=> CloudDB.col(coll).doc("main").set(data));
   },
   remove(coll, id){
@@ -1761,7 +1724,7 @@ const Persist = {
   },
 };
 
-/* ═══════════════════ SYNC STATUS PILL ═══════════════════ */
+/* ═══════════════════ SYNC STATUS ═══════════════════ */
 const SyncStatus = {
   state:"local", msg:"",
   set(state, msg){
@@ -1782,7 +1745,7 @@ const SyncStatus = {
   },
 };
 
-/* ═══════════════════ REAL-TIME LISTENERS ═══════════════════ */
+/* ═══════════════════ REALTIME ═══════════════════ */
 const Realtime = {
   unsubs: [], started: false,
   start(){
@@ -1795,7 +1758,6 @@ const Realtime = {
         err => {
           console.warn("snapshot error [" + coll + "]", err);
           SyncStatus.set("error", (err && err.message) || String(err));
-          // Try to restart on next tick if it looks like a network issue
           if (!navigator.onLine){ setTimeout(()=>{ if (navigator.onLine) this.restart(); }, 5000); }
         }
       );
@@ -1824,6 +1786,12 @@ const Realtime = {
         const n = Number(data.id);
         return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
       });
+    }
+    if (coll === "settings"){
+      for (const k of DEVICE_LOCAL_SETTING_KEYS){
+        if (DB.settings && DB.settings[k] !== undefined) value[k] = DB.settings[k];
+        else if (DEFAULT_SETTINGS[k] !== undefined)      value[k] = DEFAULT_SETTINGS[k];
+      }
     }
     const before = JSON.stringify(DB[coll] || (single ? {} : []));
     const after  = JSON.stringify(value);
@@ -1903,14 +1871,10 @@ const DB = {
 
   async _fetchCloud(){
     const dataKeys = COLLECTION_KEYS.filter(k => k !== "print_jobs");
-    const snaps = await Promise.all(
-      dataKeys.map(k => CloudDB.col(k).get())
-    );
+    const snaps = await Promise.all(dataKeys.map(k => CloudDB.col(k).get()));
     const map = {};
     dataKeys.forEach((k, i) => { map[k] = snaps[i]; });
-
     const usersEmpty = map.users.empty;
-
     if (!usersEmpty){
       const arr = snap => snap.docs.map(d => {
         const data = d.data() || {};
@@ -1928,6 +1892,10 @@ const DB = {
 
       let s = {};
       map.settings.docs.forEach(d => { if (d.id === "main") s = d.data() || {}; });
+      for (const k of DEVICE_LOCAL_SETTING_KEYS){
+        if (this.settings && this.settings[k] !== undefined) s[k] = this.settings[k];
+        else if (DEFAULT_SETTINGS[k] !== undefined)          s[k] = DEFAULT_SETTINGS[k];
+      }
       this.settings = s;
     }
     return { usersEmpty };
@@ -1964,7 +1932,6 @@ const DB = {
     }catch(e){
       this.settings.product_options = JSON.stringify(DEFAULT_OPTIONS);
     }
-
     if (!this.users.length){
       const hash = await Crypto.hash("admin123");
       this.users = [{
@@ -2048,10 +2015,7 @@ const DB = {
       this.settings.lang_v1 = "1";
       changed = true;
     }
-    if (this.settings.reset_v1 !== "1"){
-      this.settings.reset_v1 = "1";
-      changed = true;
-    }
+    if (this.settings.reset_v1 !== "1"){ this.settings.reset_v1 = "1"; changed = true; }
     if (this.settings.delivery_v1 !== "1"){
       this.settings.delivery_fee = "0";
       this.settings.delivery_v1 = "1";
@@ -2178,7 +2142,6 @@ const DB = {
     const pref = `ORD-${day}-`;
     let n = 0;
     for (const o of this.orders){ if (o.order_no && o.order_no.startsWith(pref)) n++; }
-    // Also consider in-flight drafts stored in POSPage
     return pref + String(n+1).padStart(4,"0");
   },
   _freeOrderNo(no){
@@ -2315,6 +2278,34 @@ const DB = {
       o.status === "paid" &&
       (o.created_at||"").slice(0,10) >= s &&
       (o.created_at||"").slice(0,10) <= e);
+  },
+  /* Paid orders in range with their line items attached — used by
+     the Reports orders list and the detailed Close-Cash printer. */
+  paidOrdersWithItems(s, e){
+    return this._paidOrdersInRange(s, e)
+      .map(o => Object.assign({}, o, {
+        items: this.order_items.filter(i => i.order_id === o.id),
+      }))
+      .sort((a,b)=> String(b.created_at||"").localeCompare(String(a.created_at||"")));
+  },
+  buildReceiptSnapshot(orderId){
+    const row = this.orders.find(o => o.id === orderId);
+    if (!row) return null;
+    const items = this.order_items.filter(i => i.order_id === orderId);
+    return {
+      id: row.id, no: row.order_no, type: row.order_type || "Delivery",
+      customer_id: row.customer_id, customer_name: row.customer_name || "",
+      customer_phone: row.customer_phone || "",
+      items: items.map(i => ({
+        name: i.name, qty: i.qty, unit: i.unit_price, line: i.line_total,
+        options: String(i.options||"").split(",")
+          .map(x=>x.trim()).filter(x=>x).map(x=>({label:x})),
+        note: i.note||"",
+      })),
+      subtotal: row.subtotal, discount: row.discount, tax: row.tax,
+      delivery: row.delivery, total: row.total,
+      payment_method: row.payment_method || "Cash",
+    };
   },
   summary(s, e){
     const os = this._paidOrdersInRange(s, e);
@@ -2469,6 +2460,7 @@ class EscPos {
   init(){ return this._u8(0x1B, 0x40); }
   align(n){ return this._u8(0x1B, 0x61, n & 3); }
   bold(on){ return this._u8(0x1B, 0x45, on ? 1 : 0); }
+  doubleStrike(on){ return this._u8(0x1B, 0x47, on ? 1 : 0); }
   size(w, h){ return this._u8(0x1D, 0x21, ((w & 7) << 4) | (h & 7)); }
   text(s){
     for (const ch of String(s)){
@@ -2484,10 +2476,10 @@ class EscPos {
   feed(n=1){ return this._u8(0x1B, 0x64, n & 0xFF); }
   cut(mode="partial"){
     if (mode === "none") return this;
-    this._u8(0x0A);              // extra LF before the feed
-    this.feed(CUT_FEED_LINES);   // ESC d n — print & feed n lines
-    if (mode === "full") return this._u8(0x1D, 0x56, 0x00);   // GS V 0
-    return this._u8(0x1D, 0x56, 0x42, 0x00);                  // GS V 66 0
+    this._u8(0x0A);
+    this.feed(CUT_FEED_LINES);
+    if (mode === "full") return this._u8(0x1D, 0x56, 0x00);
+    return this._u8(0x1D, 0x56, 0x42, 0x00);
   }
   kickDrawer(){ return this._u8(0x1B, 0x70, 0x00, 0x19, 0xFA); }
   bytes(){ return new Uint8Array(this.buf); }
@@ -2498,11 +2490,9 @@ const USBPrinter = {
   device: null, endpoint: null, ifaceNum: 0, _busy: false,
   isSupported(){ return typeof navigator !== "undefined" && "usb" in navigator; },
   isConnected(){ return !!(this.device && this.endpoint !== null); },
-
   async connect(){
     if (!this.isSupported()) throw new Error("WebUSB not supported in this browser (use Chrome or Edge on desktop)");
     if (!isSecureContext_()) throw new Error("WebUSB requires HTTPS or localhost");
-
     let dev = null;
     try{
       const known = await navigator.usb.getDevices();
@@ -2511,17 +2501,12 @@ const USBPrinter = {
         if (saved){
           const match = known.find(d => d.vendorId === saved.vid && d.productId === saved.pid);
           dev = match || known[0];
-        } else {
-          dev = known[0];
-        }
+        } else { dev = known[0]; }
       }
     }catch(e){}
-
     if (!dev){
       try{
-        dev = await navigator.usb.requestDevice({ filters:[
-          { classCode:7 }, { classCode:0xFF }, {}
-        ]});
+        dev = await navigator.usb.requestDevice({ filters:[{ classCode:7 }, { classCode:0xFF }, {}]});
       }catch(e){
         const m = String(e.message || e);
         if (/no device selected/i.test(m) || /cancel/i.test(m)){
@@ -2530,33 +2515,19 @@ const USBPrinter = {
         throw e;
       }
     }
-
-    // If somehow already open in this context, close it first.
-    if (dev.opened){
-      try{ await dev.close(); }catch(e){}
-    }
-
-    // Try to open — retry on access-denied (the OS may still be releasing it).
+    if (dev.opened){ try{ await dev.close(); }catch(e){} }
     let openErr = null;
     for (let attempt = 1; attempt <= 3; attempt++){
-      try{
-        await dev.open();
-        openErr = null;
-        break;
-      }catch(e){
+      try{ await dev.open(); openErr = null; break; }
+      catch(e){
         const msg = String(e.message || e);
         if (/already open/i.test(msg)){ openErr = null; break; }
         openErr = e;
-        if (/access denied/i.test(msg)){
-          await sleep(500);
-          continue;
-        }
+        if (/access denied/i.test(msg)){ await sleep(500); continue; }
         break;
       }
     }
     if (openErr) throw openErr;
-
-    // Select a configuration.
     if (dev.configuration === null){
       let cfgOk = false, cfgErr = null;
       try{ await dev.selectConfiguration(1); cfgOk = true; }
@@ -2573,8 +2544,6 @@ const USBPrinter = {
           ((cfgErr && cfgErr.message) || cfgErr || "unknown"));
       }
     }
-
-    // Find a bulk/interrupt OUT endpoint.
     let epNum = null, ifaceNum = 0;
     const ifaces = (dev.configuration && dev.configuration.interfaces) || [];
     for (const i of ifaces){
@@ -2592,25 +2561,20 @@ const USBPrinter = {
       try{ await dev.close(); }catch(e){}
       throw new Error("No OUT endpoint on this device — is it a printer?");
     }
-
-    // Claim the interface (another handle may already hold it).
-    try{
-      await dev.claimInterface(ifaceNum);
-    }catch(e){
+    try{ await dev.claimInterface(ifaceNum); }
+    catch(e){
       const msg = String(e.message || e);
       if (!/already/i.test(msg)){
         try{ await dev.close(); }catch(e2){}
         throw new Error("Could not claim USB interface: " + msg);
       }
     }
-
     this.device = dev;
     this.endpoint = epNum;
     this.ifaceNum = ifaceNum;
     STORE.set("usb_printer", { vid: dev.vendorId, pid: dev.productId });
     return { vid: dev.vendorId, pid: dev.productId };
   },
-
   async autoReconnect(){
     if (this.isConnected()) return true;
     if (!this.isSupported()) return false;
@@ -2627,7 +2591,7 @@ const USBPrinter = {
       catch(e){
         const msg = String(e.message || e);
         if (!/already open/i.test(msg) && !/access denied/i.test(msg)) return false;
-        if (/access denied/i.test(msg)) return false; // don't retry in background
+        if (/access denied/i.test(msg)) return false;
       }
       if (dev.configuration === null){
         try{ await dev.selectConfiguration(1); }catch(e){ return false; }
@@ -2651,12 +2615,10 @@ const USBPrinter = {
       return true;
     }catch(e){ return false; }
   },
-
   async disconnect(){
     try{ if (this.device) await this.device.close(); }catch(e){}
     this.device = null; this.endpoint = null;
   },
-
   async send(bytes){
     if (!this.isConnected()){
       const ok = await this.autoReconnect();
@@ -2675,78 +2637,48 @@ const USBPrinter = {
       }
     } finally { this._busy = false; }
   },
-
-  /* ── Troubleshooting help ───────────────────────────── */
   showHelp(errMsg){
     const ua = navigator.userAgent || "";
     const isWin   = /Win/i.test(ua);
     const isMac   = /Mac/i.test(ua);
     const isLinux = /Linux/i.test(ua) && !/Android/i.test(ua);
-
     let osSteps = "";
     if (isWin){
       osSteps = `
-        <li><b>Windows:</b> The printer is claimed by the Windows print driver.
-            WebUSB cannot share it.</li>
+        <li><b>Windows:</b> The printer is claimed by the Windows print driver. WebUSB cannot share it.</li>
         <li>Download <b>Zadig</b> from <b>zadig.akeo.ie</b> (free).</li>
-        <li>Plug the printer in, open Zadig, choose the printer from the dropdown,
-            select <b>WinUSB</b> as the target driver, click <b>Replace Driver</b>.</li>
-        <li>Unplug, replug the printer, then click <b>Connect USB</b> again.</li>
-        <li class="faint">⚠ After this, Windows' own print dialog will no longer
-            use this printer — only this app will. To undo, use Device Manager
-            → Uninstall device → scan for hardware changes.</li>`;
+        <li>Plug the printer in, open Zadig, choose the printer, select <b>WinUSB</b>, click <b>Replace Driver</b>.</li>
+        <li>Unplug, replug, then click <b>Connect USB</b> again.</li>`;
     } else if (isMac){
       osSteps = `
-        <li><b>macOS:</b> Quit any app that may be using the printer
-            (System Settings → Printers &amp; Scanners, Preview, other browsers).</li>
-        <li>Unplug, replug the printer, then try <b>Connect USB</b> again.</li>
-        <li>If it still fails, grant Chrome permission under
-            <b>System Settings → Privacy &amp; Security → Input Monitoring</b>
-            (some USB HID devices appear there).</li>`;
+        <li><b>macOS:</b> Quit any app that may be using the printer.</li>
+        <li>Unplug, replug, try <b>Connect USB</b> again.</li>
+        <li>Grant Chrome permission under <b>System Settings → Privacy &amp; Security → Input Monitoring</b>.</li>`;
     } else if (isLinux){
       osSteps = `
         <li><b>Linux:</b> The kernel module <code>usblp</code> is holding the printer.</li>
-        <li>Run <code>sudo modprobe -r usblp</code> (until reboot), or</li>
-        <li>Add a udev rule so your user can claim it:
-            <code>/etc/udev/rules.d/99-usb-printer.rules</code><br>
-            <code>SUBSYSTEM=="usb", ATTR{idVendor}=="XXXX", ATTR{idProduct}=="YYYY", MODE="0666", GROUP="plugdev"</code></li>
-        <li>Then <code>sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</code>,
-            unplug/replug, and try again.</li>`;
+        <li>Run <code>sudo modprobe -r usblp</code> (until reboot).</li>
+        <li>Add a udev rule so your user can claim it.</li>`;
     } else {
-      osSteps = `<li>Try a different USB port, a different cable, or restart the browser.</li>`;
+      osSteps = `<li>Try a different USB port, cable, or restart the browser.</li>`;
     }
-
     Modal.open(`
       <div class="m-head"><h2>🔌 USB Connection Help</h2></div>
       <div class="m-body">
-        <div class="danger-warn" style="margin-bottom:12px;">
-          <b>${escapeHtml(errMsg || "Access denied")}</b>
-        </div>
-        <div class="faint" style="font-size:12px; margin-bottom:10px; line-height:1.7;">
-          WebUSB needs <b>exclusive access</b> to the printer. If any other program,
-          driver, or browser tab is using it, Chrome returns <b>Access denied</b>.
-        </div>
+        <div class="danger-warn" style="margin-bottom:12px;"><b>${escapeHtml(errMsg || "Access denied")}</b></div>
         <ol class="install-steps" style="font-size:12px;">
-          <li><b>Close every other tab</b> of this app — only one tab can hold the printer.</li>
-          <li>Close any other app that might use the printer (Notepad, Preview,
-              Word, the OS print spooler, another browser).</li>
+          <li><b>Close every other tab</b> of this app.</li>
+          <li>Close any other app that might use the printer.</li>
           ${osSteps}
-          <li>Still stuck? Open <code>chrome://settings/content/usbDevices</code>
-              and remove the printer, then reload the page and click
-              <b>Connect USB</b> to grant access again.</li>
-          <li class="faint">Easiest fallback: switch <b>Printer mode</b> to
-              <b>Browser</b> or <b>Agent</b> — no raw USB access needed.</li>
+          <li class="faint">Easiest fallback: switch <b>Printer mode</b> to <b>Browser</b>.</li>
         </ol>
       </div>
       <div class="m-foot">
         <button class="btn" id="usb-help-mode-browser">Switch to Browser mode</button>
         <button class="btn primary" id="usb-help-close">OK</button>
       </div>`);
-
-    const closeBtn = document.getElementById("usb-help-close");
-    if (closeBtn) closeBtn.addEventListener("click", ()=>Modal.close());
-    const swBtn = document.getElementById("usb-help-mode-browser");
-    if (swBtn) swBtn.addEventListener("click", ()=>{
+    document.getElementById("usb-help-close")?.addEventListener("click", ()=>Modal.close());
+    document.getElementById("usb-help-mode-browser")?.addEventListener("click", ()=>{
       DB.settings.printer_mode = "browser";
       DB.save("settings");
       Persist.putObject("settings", DB.settings);
@@ -2819,11 +2751,13 @@ function buildEscPosBody(order, settings, copyLabel){
   const sym = settings.currency_symbol || "LBP ";
   const p = new EscPos();
   p.init();
+  p.bold(true);
+  p.doubleStrike(true);
   p.align(1);
   if (settings.restaurant_name){
-    p.size(1,1); p.bold(true);
+    p.size(1,1);
     p.line(settings.restaurant_name);
-    p.size(0,0); p.bold(false);
+    p.size(0,0);
   }
   if (settings.tagline) p.line(settings.tagline);
   if (settings.address) p.line(settings.address);
@@ -2831,9 +2765,9 @@ function buildEscPosBody(order, settings, copyLabel){
   p.align(0);
   p.line(sep("-"));
   if (copyLabel){
-    p.align(1); p.bold(true);
+    p.align(1);
     p.line("*** " + copyLabel + " ***");
-    p.bold(false); p.align(0);
+    p.align(0);
     p.line(sep("-"));
   }
   const when = new Date().toLocaleString([], { hour12:false });
@@ -2855,9 +2789,9 @@ function buildEscPosBody(order, settings, copyLabel){
   if (order.delivery) p.line(lr("Delivery", fmtMoney(order.delivery, sym)));
   else p.line(lr("Delivery", "FREE"));
   p.line(sep("="));
-  p.bold(true); p.size(1,1);
+  p.size(1,1);
   p.line(lr("TOTAL", fmtMoney(order.total, sym)));
-  p.size(0,0); p.bold(false);
+  p.size(0,0);
   const rate = Number(settings.secondary_rate)||90000;
   const sec  = (settings.secondary_currency||"USD").toUpperCase();
   const secSym = sec === "USD" ? "$" : sec + " ";
@@ -2872,14 +2806,18 @@ function buildEscPosBody(order, settings, copyLabel){
   if (settings.receipt_footer){
     p.align(1); p.line(settings.receipt_footer); p.align(0);
   }
+  p.doubleStrike(false);
+  p.bold(false);
   return p.bytes();
 }
+
+/* Cut FIRST, then kick drawer AFTER */
 function buildEscPosCut(settings, opts){
   opts = opts || {};
   const mode = settings.printer_cut || "partial";
   const p = new EscPos();
-  if (opts.drawer) p.kickDrawer();
   p.cut(mode);
+  if (opts.drawer) p.kickDrawer();
   return p.bytes();
 }
 function buildEscPosReceipt(order, settings, copyLabel){
@@ -2887,20 +2825,110 @@ function buildEscPosReceipt(order, settings, copyLabel){
   const cut  = buildEscPosCut(settings, { drawer: settings.printer_drawer === "1" });
   return concatBytes(body, cut);
 }
+
+/* ───────────────────────────────────────────────────────────────
+   CLOSE-CASH report — DETAILED invoice-style.
+   Every cash order is expanded with its line items:
+     name • qty × unit ........ line total
+   Then a full expense list, then the drawer summary.
+   ─────────────────────────────────────────────────────────────── */
 function buildCloseCashText(start, end, settings){
   const sym = settings.currency_symbol || "LBP ";
   const cash = DB.cashSummary(start, end);
   const lines = [];
+
   lines.push(center(settings.restaurant_name || "Pizza POS"));
+  if (settings.address) lines.push(center(settings.address));
+  if (settings.phone)   lines.push(center(settings.phone));
   lines.push(center("CLOSE CASH REPORT"));
   lines.push(sep("="));
   lines.push(center(start + "  ->  " + end));
-  lines.push(sep("-"));
-  lines.push(lr("Cash orders", String(cash.cash_orders)));
-  lines.push(lr("Cash sales",  fmtMoney(cash.cash_sales, sym)));
-  lines.push(lr("Expenses",    fmtMoney(cash.expenses, sym)));
+  lines.push(center(new Date().toLocaleString([], { hour12:false })));
+  lines.push(sep("="));
+
+  /* ── CASH ORDERS — full invoice detail per order ── */
+  const cashOrders = DB.paidOrdersWithItems(start, end)
+    .filter(o => o.payment_method === "Cash");
+
+  lines.push("");
+  lines.push("CASH ORDERS (" + cashOrders.length + ")");
+  lines.push(sep("="));
+
+  if (!cashOrders.length){
+    lines.push("  (none)");
+    lines.push(sep("-"));
+  } else {
+    let grandItems = 0;
+    let grandLines = 0;
+
+    for (let idx = 0; idx < cashOrders.length; idx++){
+      const o = cashOrders[idx];
+      const no   = String(o.order_no || "").split("-").pop();
+      const when = (o.created_at || "").slice(11,16);
+      const date = (o.created_at || "").slice(0,10);
+
+      lines.push("");
+      lines.push(sep("-"));
+      lines.push(lr("#" + no + "  " + date + " " + when, fmtMoney(o.total, sym)));
+      if (o.customer_name){
+        const cLine = "  Customer: " + o.customer_name +
+          (o.customer_phone ? "  " + o.customer_phone : "");
+        lines.push(cLine.slice(0, RECEIPT_WIDTH));
+      }
+      lines.push("  Items:");
+      for (const it of (o.items || [])){
+        grandItems += Number(it.qty||0);
+        grandLines += 1;
+        const nm = "    " + it.name;
+        lines.push(nm.slice(0, RECEIPT_WIDTH));
+        const optStr = (it.options || "").trim();
+        if (optStr) lines.push(("      " + optStr).slice(0, RECEIPT_WIDTH));
+        if (it.note) lines.push(("      Note: " + it.note).slice(0, RECEIPT_WIDTH));
+        lines.push(lr(
+          "      " + it.qty + " x " + fmtMoney(it.unit_price, sym),
+          fmtMoney(it.line_total, sym)
+        ));
+      }
+      lines.push(lr("  Order total", fmtMoney(o.total, sym)));
+    }
+
+    lines.push(sep("-"));
+    lines.push(lr("Total line items", String(grandLines)));
+    lines.push(lr("Total qty",        String(grandItems)));
+    lines.push(lr("Cash sales",       fmtMoney(cash.cash_sales, sym)));
+    lines.push(sep("="));
+  }
+
+  /* ── EXPENSES — full detail ── */
+  const expenses = DB.expenses
+    .filter(x => (x.spent_on||"") >= start && (x.spent_on||"") <= end)
+    .sort((a,b) => String(a.spent_on||"").localeCompare(String(b.spent_on||"")));
+
+  lines.push("");
+  lines.push("EXPENSES (" + expenses.length + ")");
+  lines.push(sep("="));
+  if (!expenses.length){
+    lines.push("  (none)");
+    lines.push(sep("-"));
+  } else {
+    for (const e of expenses){
+      const left = ("  " + (e.spent_on||"") + " " +
+                    (e.category||"") + ": " + (e.description||"")).slice(0, 30);
+      lines.push(lr(left, fmtMoney(e.amount||0, sym)));
+    }
+    lines.push(sep("-"));
+    lines.push(lr("Expenses total", fmtMoney(cash.expenses, sym)));
+    lines.push(sep("="));
+  }
+
+  /* ── Drawer summary ── */
+  lines.push("");
+  lines.push(lr("CASH ORDERS", String(cash.cash_orders)));
+  lines.push(lr("CASH SALES",  fmtMoney(cash.cash_sales, sym)));
+  lines.push(lr("EXPENSES",    fmtMoney(cash.expenses,   sym)));
   lines.push(sep("="));
   lines.push(lr("EXPECTED DRAWER", fmtMoney(cash.expected, sym)));
+
   const rate = Number(settings.secondary_rate)||90000;
   const sec  = (settings.secondary_currency||"USD").toUpperCase();
   const secSym = sec === "USD" ? "$" : sec + " ";
@@ -2911,17 +2939,10 @@ function buildCloseCashText(start, end, settings){
   lines.push(lr("Closed by", "________________"));
   lines.push(lr("Signature", "________________"));
   lines.push("");
-  lines.push(center(new Date().toLocaleString([], { hour12:false })));
   return lines.join("\n");
 }
 
-/* ═══════════════════ PRINTER ═══════════════════
-   Fixes:
-   • Browser mode now prints via an isolated hidden iframe — no popup
-     blockers, no global style pollution, works on tablets and phones.
-   • USB mode auto-reconnects and retries one time on failure.
-   • Agent mode uses a strict timeout so a dead agent doesn't hang the app.
-   • Cloud mode queues the job to Firestore so the store listener picks it up. */
+/* ═══════════════════ PRINTER ═══════════════════ */
 const Printer = {
   copies(settings){
     const n = Number(settings.printer_copies || 2);
@@ -2948,7 +2969,6 @@ const Printer = {
     }
     return jobs;
   },
-
   async print(order, settings){
     const mode = (settings.printer_mode || "browser").toLowerCase();
     const jobs = this._buildJobs(order, settings);
@@ -2959,7 +2979,6 @@ const Printer = {
       default:      return await this._browser(order, settings);
     }
   },
-
   async _usb(jobs, order, settings){
     if (!USBPrinter.isSupported()){
       toast("WebUSB not supported — use Chrome/Edge on desktop, over HTTPS or localhost.", "error", 6000);
@@ -2975,17 +2994,16 @@ const Printer = {
     try{
       for (let i = 0; i < jobs.length; i++){
         const job = jobs[i];
-        try{
-          await USBPrinter.send(job.body);
-        }catch(e1){
-          // One retry with reconnect
+        try{ await USBPrinter.send(job.body); }
+        catch(e1){
           const ok = await USBPrinter.autoReconnect();
           if (!ok) throw e1;
           await USBPrinter.send(job.body);
         }
         await sleep(Math.min(job.ms, 4000));
         if (job.cut && job.cut.length){
-          try{ await USBPrinter.send(job.cut); }catch(e){ /* retry */ 
+          try{ await USBPrinter.send(job.cut); }
+          catch(e){
             try{ const ok = await USBPrinter.autoReconnect(); if (ok) await USBPrinter.send(job.cut); }catch(e2){}
           }
           await sleep(800);
@@ -2996,13 +3014,10 @@ const Printer = {
     }catch(e){
       const msg = e.message || String(e);
       toast("USB print failed: " + msg, "error", 6000);
-      if (/access denied|not connected/i.test(msg)){
-        setTimeout(()=>USBPrinter.showHelp(msg), 400);
-      }
+      if (/access denied|not connected/i.test(msg)) setTimeout(()=>USBPrinter.showHelp(msg), 400);
       return { ok:false, error:msg };
     }
   },
-
   async _agent(jobs, order, settings){
     const url = (settings.printer_agent_url || "").trim();
     if (!url){ toast("Set the Print Agent URL in Settings → Printer.", "warning", 5000); return { ok:false, error:"no agent url" }; }
@@ -3037,16 +3052,6 @@ const Printer = {
       return { ok:false, error:msg };
     }
   },
-
-  /* ── Cloud print ────────────────────────────────────────────────
-     We send BOTH:
-       • data  — the raw concatenated ESC/POS bytes (legacy listeners)
-       • order — the full order payload (new listeners rebuild the receipt
-                 locally with their OWN settings so remote printing
-                 matches local printing exactly: 2 separated copies,
-                 cut between copies, drawer kick, etc.)
-     The queued copy count is forced to at least 2 so remote printing
-     always produces 2 separated copies like local printing. */
   async _cloud(jobs, order, settings){
     if (settings.firebase_enabled !== "1"){
       toast("Cloud print needs Firebase enabled (Settings → Cloud).", "warning", 5000);
@@ -3077,7 +3082,6 @@ const Printer = {
       return { ok:false, error:e.message };
     }
   },
-
   async _browser(order, settings){
     const copies = this.copies(settings);
     const blocks = [];
@@ -3088,20 +3092,25 @@ const Printer = {
     await this.printTextViaIframe(blocks);
     return { ok:true };
   },
-
-  /* Isolated printing via hidden iframe — reliable on mobile & desktop. */
   async printTextViaIframe(blocks){
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       html,body{margin:0;padding:0;background:#fff;color:#000;}
       .receipt-copy{
-        font-family:'Courier New', ui-monospace, monospace;
-        font-size:12px; line-height:1.35; white-space:pre;
-        padding:6mm 4mm 18mm 4mm;   /* extra bottom space so each copy visibly separates */
-        page-break-after:always;
-        break-after:page;
+        font-family:'Consolas','Menlo','DejaVu Sans Mono','Courier New',ui-monospace,monospace;
+        font-size:12px; font-weight:700;
+        -webkit-text-stroke:0.35px #000;
+        text-shadow:0 0 0.6px #000, 0 0 0.4px #000;
+        line-height:1.35; letter-spacing:0.1px;
+        white-space:pre;
+        padding:6mm 4mm 18mm 4mm;
+        page-break-after:always; break-after:page;
+        -webkit-font-smoothing:none;
       }
       .receipt-copy:last-child{ page-break-after:auto; break-after:auto; }
-      @media print{ @page{ size:80mm auto; margin:0; } }
+      @media print{
+        @page{ size:80mm auto; margin:0; }
+        .receipt-copy{ -webkit-text-stroke:0.35px #000; text-shadow:0 0 0.6px #000; }
+      }
     </style></head><body>${
       blocks.map(b => `<div class="receipt-copy">${escapeHtml(b)}</div>`).join("")
     }</body></html>`;
@@ -3110,114 +3119,96 @@ const Printer = {
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
     document.body.appendChild(iframe);
-
     try{
       const doc = iframe.contentDocument || iframe.contentWindow.document;
-      doc.open();
-      doc.write(html);
-      doc.close();
+      doc.open(); doc.write(html); doc.close();
       await new Promise(r=>setTimeout(r, 250));
       const w = iframe.contentWindow;
-      w.focus();
-      w.print();
-      // Clean up after the print dialog would close
+      w.focus(); w.print();
       setTimeout(()=>{ try{ iframe.remove(); }catch(e){} }, 2500);
     }catch(e){
-      // Fallback: use the legacy receipt-area + window.print()
       try{ iframe.remove(); }catch(_){}
       const area = document.getElementById("receipt-area");
       area.innerHTML = blocks.map(b => `<div class="receipt-copy">${escapeHtml(b + "\n\n\n\n")}</div>`).join("");
       setTimeout(()=>window.print(), 80);
     }
   },
-
   async printText(text, settings){
     const mode = (settings.printer_mode || "browser").toLowerCase();
-    if (mode !== "browser"){
-      const p = new EscPos();
-      p.init(); p.align(0);
-      for (const line of String(text).split("\n")) p.line(line);
-      if (settings.printer_drawer === "1") p.kickDrawer();
-      p.cut(settings.printer_cut || "partial");
-      const bytes = p.bytes();
-      if (mode === "usb"){
-        if (!USBPrinter.isConnected()){
-          const ok = await USBPrinter.autoReconnect();
-          if (!ok){ toast("USB printer not connected","warning"); return { ok:false }; }
-        }
-        try{ await USBPrinter.send(bytes); toast("🖨  Printed (USB)","success"); return { ok:true }; }
-        catch(e){ toast("USB print failed: " + e.message,"error",5000); return { ok:false }; }
+    if (mode === "browser"){
+      await this.printTextViaIframe([text]);
+      return { ok:true };
+    }
+    const p = new EscPos();
+    p.init();
+    p.bold(true); p.doubleStrike(true); p.align(0);
+    for (const line of String(text).split("\n")) p.line(line);
+    p.cut(settings.printer_cut || "partial");
+    if (settings.printer_drawer === "1") p.kickDrawer();
+    p.doubleStrike(false); p.bold(false);
+    const bytes = p.bytes();
+
+    if (mode === "usb"){
+      if (!USBPrinter.isConnected()){
+        const ok = await USBPrinter.autoReconnect();
+        if (!ok){ toast("USB printer not connected","warning"); return { ok:false }; }
       }
-      if (mode === "agent"){
-        const url = (settings.printer_agent_url || "").trim();
-        if (!url){ toast("Set Print Agent URL","warning"); return { ok:false }; }
+      try{ await USBPrinter.send(bytes); toast("🖨  Printed (USB)","success"); return { ok:true }; }
+      catch(e){ toast("USB print failed: " + e.message,"error",5000); return { ok:false }; }
+    }
+    if (mode === "agent"){
+      const url = (settings.printer_agent_url || "").trim();
+      if (!url){ toast("Set Print Agent URL","warning"); return { ok:false }; }
+      try{
+        const headers = { "Content-Type":"application/json" };
+        if (settings.printer_agent_token) headers["X-Auth-Token"] = settings.printer_agent_token;
+        const ctrl = new AbortController();
+        const timer = setTimeout(()=>ctrl.abort(), 12000);
+        let r;
         try{
-          const headers = { "Content-Type":"application/json" };
-          if (settings.printer_agent_token) headers["X-Auth-Token"] = settings.printer_agent_token;
-          const ctrl = new AbortController();
-          const timer = setTimeout(()=>ctrl.abort(), 12000);
-          let r;
-          try{
-            r = await fetch(url.replace(/\/+$/,"") + "/print", {
-              method:"POST", headers,
-              body: JSON.stringify({
-                printer: settings.printer_name || "",
-                order_no: "CLOSE-CASH",
-                cut: settings.printer_cut || "partial",
-                cut_each: false,
-                drawer: settings.printer_drawer === "1",
-                jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
-              }),
-              signal: ctrl.signal,
-            });
-          } finally { clearTimeout(timer); }
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          toast("🖨  Sent to agent","success"); return { ok:true };
-        }catch(e){ toast("Print agent failed: " + e.message,"error",5000); return { ok:false }; }
-      }
-      if (mode === "cloud"){
-        if (settings.firebase_enabled !== "1"){ toast("Cloud print needs Firebase","warning"); return { ok:false }; }
-        if (!CloudDB.ready){ toast("Cloud not connected","error"); return { ok:false }; }
-        try{
-          await CloudSync.queuePrintJob({
-            printer_name: settings.printer_name || "",
-            order_no: "CLOSE-CASH",
-            cut: settings.printer_cut || "partial",
-            cut_each: false,
-            drawer: settings.printer_drawer === "1",
-            copies: 1, data: Array.from(bytes),
+          r = await fetch(url.replace(/\/+$/,"") + "/print", {
+            method:"POST", headers,
+            body: JSON.stringify({
+              printer: settings.printer_name || "",
+              order_no: "CLOSE-CASH",
+              cut: settings.printer_cut || "partial",
+              cut_each: false,
+              drawer: settings.printer_drawer === "1",
+              jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
+            }),
+            signal: ctrl.signal,
           });
-          toast("☁  Close Cash queued","success"); return { ok:true };
-        }catch(e){ toast("Cloud print failed: " + e.message,"error",5000); return { ok:false }; }
-      }
+        } finally { clearTimeout(timer); }
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        toast("🖨  Sent to agent","success"); return { ok:true };
+      }catch(e){ toast("Print agent failed: " + e.message,"error",5000); return { ok:false }; }
+    }
+    if (mode === "cloud"){
+      if (settings.firebase_enabled !== "1"){ toast("Cloud print needs Firebase","warning"); return { ok:false }; }
+      if (!CloudDB.ready){ toast("Cloud not connected","error"); return { ok:false }; }
+      try{
+        await CloudSync.queuePrintJob({
+          printer_name: settings.printer_name || "",
+          order_no: "CLOSE-CASH",
+          cut: settings.printer_cut || "partial",
+          cut_each: false,
+          drawer: settings.printer_drawer === "1",
+          copies: 1, data: Array.from(bytes),
+        });
+        toast("☁  Close Cash queued","success"); return { ok:true };
+      }catch(e){ toast("Cloud print failed: " + e.message,"error",5000); return { ok:false }; }
     }
     await this.printTextViaIframe([text]);
     return { ok:true };
   },
 };
 
-/* ═══════════════════ PRINT LISTENER ═══════════════════
-   Runs on the STORE device. Watches the print_jobs collection for
-   pending jobs created by OTHER devices and prints them locally.
-
-   When a job carries the full order payload (new format), the listener
-   rebuilds the receipt using THIS device's own printer settings, so the
-   remote printout is identical to a local print — including the number
-   of separated copies (forced to 2), cut between copies, and drawer kick.
-
-   Fixes:
-   • Skips its own jobs based on device UID AND local device marker.
-   • Uses a transactional claim so two listeners can't both print.
-   • Auto-restarts the snapshot listener if it drops.
-   • Periodic poll is a safety net for missed snapshot events.
-   • Retries a failed print once before marking the job as error. */
+/* ═══════════════════ PRINT LISTENER ═══════════════════ */
 const PrintListener = {
   unsub: null, active: false, processing: new Set(),
   lastJobAt: null, lastJobInfo: "", processedCount: 0, failedCount: 0,
   _restartTimer: null,
-
   isEnabled(){ return DB.settings.printer_store_listener === "1"; },
-
   start(){
     if (!this.isEnabled()){ this.stop(); return; }
     if (!CloudDB.ready){
@@ -3246,7 +3237,6 @@ const PrintListener = {
           console.warn("Print listener error:", err);
           ListenerPill.set("error", "Listener error: " + ((err && err.message) || err));
           this.active = false;
-          // Auto-restart on error
           if (!this._restartTimer){
             this._restartTimer = setTimeout(()=>{
               this._restartTimer = null;
@@ -3262,7 +3252,6 @@ const PrintListener = {
       ListenerPill.set("error", String(e.message || e));
     }
   },
-
   stop(){
     if (this._restartTimer){ clearTimeout(this._restartTimer); this._restartTimer = null; }
     if (this.unsub){ try{ this.unsub(); }catch(e){} }
@@ -3270,9 +3259,7 @@ const PrintListener = {
     this.active = false;
     ListenerPill.set("off", "Listener off");
   },
-
   restart(){ this.stop(); if (this.isEnabled()) this.start(); },
-
   async _claim(jobId){
     const colName = CloudDB.printJobsCol();
     const ref = CloudDB.db.collection(colName).doc(jobId);
@@ -3298,18 +3285,15 @@ const PrintListener = {
       return { ok:false, reason: String(e.message || e) };
     }
   },
-
   async _mark(jobId, patch){
     const colName = CloudDB.printJobsCol();
     try{ await CloudDB.db.collection(colName).doc(jobId).update(sanitize(patch)); }
     catch(e){ console.warn("mark job failed:", e); }
   },
-
   async handleJob(jobId, data){
     if (this.processing.has(jobId)) return;
     this.processing.add(jobId);
     try{
-      // Skip jobs created on this same device — they were already printed locally.
       if (data.created_by && CloudDB.uid && data.created_by === CloudDB.uid){
         await this._mark(jobId, {
           status: "done", printed_at: nowIso(), printed_by: CloudDB.uid,
@@ -3329,14 +3313,10 @@ const PrintListener = {
       const hasOrder = job.order && typeof job.order === "object" && Array.isArray(job.order.items);
       if (!bytes.length && !hasOrder) throw new Error("job has no data");
 
-      // Try printing; retry once if the first attempt fails.
       let lastErr = null;
       for (let attempt = 1; attempt <= 2; attempt++){
-        try{
-          await this._printLocal(bytes, job);
-          lastErr = null;
-          break;
-        }catch(e){
+        try{ await this._printLocal(bytes, job); lastErr = null; break; }
+        catch(e){
           lastErr = e;
           console.warn("[PrintListener] attempt", attempt, "failed:", e.message);
           if (attempt < 2) await sleep(1500);
@@ -3363,33 +3343,18 @@ const PrintListener = {
       toast("Remote print failed: " + (e.message || e), "error", 5000);
     } finally { this.processing.delete(jobId); }
   },
-
-async _printLocal(bytes, job){
-    // ── NEW PATH: full order payload present → rebuild & print locally ──
-    // Remote output MUST always be 2 (or more) individually cut receipts,
-    // independent of whatever "cut between copies" setting exists here.
+  async _printLocal(bytes, job){
     if (job && job.order && typeof job.order === "object" && Array.isArray(job.order.items)){
       const storeSettings = Object.assign({}, DB.settings);
-
-      // 1. Force at least 2 copies
       const wantCopies = Math.max(2, Math.min(3, Number(job.copies) || 2));
       storeSettings.printer_copies = String(wantCopies);
-
-      // 2. FORCE a cut between copies (this is the fix)
       storeSettings.printer_cut_between = "1";
-
-      // 3. FORCE a real cut mode; never "none"
       if (job.cut && job.cut !== "none") storeSettings.printer_cut = job.cut;
       else if (!storeSettings.printer_cut || storeSettings.printer_cut === "none")
         storeSettings.printer_cut = "partial";
-
-      // 4. Drawer kick if requested
       if (job.drawer) storeSettings.printer_drawer = "1";
-
       return await this._printOrder(job.order, storeSettings);
     }
-
-    // ── LEGACY PATH: raw ESC/POS bytes ──
     const mode = (DB.settings.printer_mode || "browser").toLowerCase();
     if (mode === "usb"){
       if (!USBPrinter.isConnected()){
@@ -3423,15 +3388,10 @@ async _printLocal(bytes, job){
       if (!r.ok) throw new Error("agent HTTP " + r.status);
       return;
     }
-    // Browser fallback for the store device — decode ESC/POS and print via iframe.
     const text = this._decodeEscPosText(bytes);
     await Printer.printTextViaIframe([text]);
   },
-
-  /* Rebuild and print an order using THIS device's settings, emitting the
-     same separated copies as local printing (body + cut per copy). */
   async _printOrder(order, settings){
-    // ── HARD-FORCE separated copies for remote printing ──
     settings = Object.assign({}, settings);
     settings.printer_cut_between = "1";
     if (!settings.printer_cut || settings.printer_cut === "none"){
@@ -3439,7 +3399,6 @@ async _printLocal(bytes, job){
     }
     const _n = Number(settings.printer_copies || 2);
     settings.printer_copies = String(Math.max(2, Math.min(3, _n)));
-
     const mode = (settings.printer_mode || "browser").toLowerCase();
     const jobs = Printer._buildJobs(order, settings);
 
@@ -3449,26 +3408,18 @@ async _printLocal(bytes, job){
         if (!ok) throw new Error("USB printer not connected on store device");
       }
       for (const j of jobs){
-        // 1. Send the body of this copy
         await USBPrinter.send(j.body);
-        // 2. Let the printer finish the body before sending the cut
         await sleep(Math.min(j.ms, 4000));
-        // 3. Send the cut command for this copy
         if (j.cut && j.cut.length){
           try{ await USBPrinter.send(j.cut); }
           catch(e){
-            try{
-              const ok = await USBPrinter.autoReconnect();
-              if (ok) await USBPrinter.send(j.cut);
-            }catch(e2){}
+            try{ const ok = await USBPrinter.autoReconnect(); if (ok) await USBPrinter.send(j.cut); }catch(e2){}
           }
-          // 4. Give the cutter time to actuate before the next copy begins
           await sleep(1200);
         }
       }
       return;
     }
-
     if (mode === "agent"){
       const url = (settings.printer_agent_url || "").trim();
       if (!url) throw new Error("no agent URL on store device");
@@ -3478,9 +3429,8 @@ async _printLocal(bytes, job){
         printer: settings.printer_name || "",
         order_no: order.no || "",
         cut: settings.printer_cut || "partial",
-        cut_each: true,                                  // ← force cut after each copy
+        cut_each: true,
         drawer: settings.printer_drawer === "1",
-        // Each entry is a complete body+cut byte stream for ONE copy.
         jobs: jobs.map(j => ({ label: j.label, data: Array.from(j.full) })),
       };
       const ctrl = new AbortController();
@@ -3494,12 +3444,9 @@ async _printLocal(bytes, job){
       if (!r.ok) throw new Error("agent HTTP " + r.status);
       return;
     }
-
-    // Browser fallback — each copy is its own block → each gets its own page.
     const blocks = jobs.map(j => buildReceiptText(order, settings, j.label));
     await Printer.printTextViaIframe(blocks);
   },
-
   _decodeEscPosText(bytes){
     const out = [];
     let i = 0;
@@ -3511,6 +3458,7 @@ async _printLocal(bytes, job){
         if (c === 0x40){ i += 2; continue; }
         if (c === 0x61){ i += 3; continue; }
         if (c === 0x45){ i += 3; continue; }
+        if (c === 0x47){ i += 3; continue; }
         if (c === 0x64){ i += 3; continue; }
         if (c === 0x70){ i += 5; continue; }
         i += 2; continue;
@@ -3529,7 +3477,6 @@ async _printLocal(bytes, job){
     }
     return out.join("");
   },
-
   async poll(){
     if (!this.isEnabled() || !CloudDB.ready) return;
     const colName = CloudDB.printJobsCol();
@@ -3584,7 +3531,6 @@ const ResetReports = {
     }
     return { ordersN, itemsN, expN };
   },
-
   async run(scope, from, to){
     const orderIds = new Set();
     for (const o of DB.orders){
@@ -3594,7 +3540,6 @@ const ResetReports = {
         if (d >= from && d <= to) orderIds.add(o.id);
       }
     }
-
     if (CloudDB.ready){
       try{
         const osnap = await CloudDB.col("orders").get();
@@ -3634,18 +3579,13 @@ const ResetReports = {
         throw e;
       }
     }
-
     DB.orders      = DB.orders.filter(o => !orderIds.has(o.id));
     DB.order_items = DB.order_items.filter(i => !orderIds.has(i.order_id));
-    if (scope === "all"){
-      DB.expenses = [];
-    } else {
-      DB.expenses = DB.expenses.filter(e => !((e.spent_on||"") >= from && (e.spent_on||"") <= to));
-    }
+    if (scope === "all") DB.expenses = [];
+    else DB.expenses = DB.expenses.filter(e => !((e.spent_on||"") >= from && (e.spent_on||"") <= to));
     DB.saveAll();
     return orderIds.size;
   },
-
   open(onDone){
     Modal.open(`
       <div class="m-head"><h2>${escapeHtml(t("reset_reports"))}</h2></div>
@@ -3674,7 +3614,6 @@ const ResetReports = {
         <button class="btn" id="rs-cancel">${escapeHtml(t("cancel"))}</button>
         <button class="btn danger" id="rs-go">${escapeHtml(t("reset_confirm"))}</button>
       </div>`);
-
     let scope = "all";
     const updatePreview = ()=>{
       const pv = document.getElementById("rs-preview");
@@ -3691,7 +3630,6 @@ const ResetReports = {
         `<b>Order lines:</b> ${c.itemsN}<br>` +
         `<b>${escapeHtml(t("expenses"))}:</b> ${c.expN}`;
     };
-
     const seg = document.getElementById("rs-seg");
     seg.querySelectorAll("button").forEach(b=>{
       b.addEventListener("click", ()=>{
@@ -3705,15 +3643,12 @@ const ResetReports = {
     const rt = document.getElementById("rs-to");
     if (rf) rf.addEventListener("change", updatePreview);
     if (rt) rt.addEventListener("change", updatePreview);
-
     document.getElementById("rs-cancel").addEventListener("click", ()=>Modal.close());
     document.getElementById("rs-go").addEventListener("click", async ()=>{
       const f  = rf.value;
       const t2 = rt.value;
       if (scope === "range" && (!f || !t2)){ toast(t("required"), "warning"); return; }
-      const msg = scope === "all"
-        ? t("reset_go_all_q")
-        : t("reset_go_range_q", { from: f, to: t2 });
+      const msg = scope === "all" ? t("reset_go_all_q") : t("reset_go_range_q", { from: f, to: t2 });
       if (!confirm(msg)) return;
       const goBtn = document.getElementById("rs-go");
       goBtn.disabled = true;
@@ -3733,16 +3668,9 @@ const ResetReports = {
   },
 };
 
-/* ═══════════════════ POS PAGE ═══════════════════
-   Supports UNLIMITED held orders:
-   • Tab bar at the top of the cart shows every open order (scrolls).
-   • A "Held Orders (N)" button opens a full modal list with Load/Void/Print.
-   • The cart always holds the currently edited order — holding it saves
-     and starts a fresh draft, so you can cycle through hundreds of orders.
-*/
+/* ═══════════════════ POS PAGE ═══════════════════ */
 const POSPage = {
   current_order: null, current_cat: null, search: "", initialized: false,
-
   init(){
     if (this.initialized) return;
     this.initialized = true;
@@ -3802,7 +3730,6 @@ const POSPage = {
           <button class="btn success pay" id="pos-pay">${escapeHtml(t("pay_cash"))}</button>
         </div>
       </div>`;
-
     document.getElementById("pos-search").addEventListener("input", e=>{
       this.search = e.target.value; this.renderProducts();
     });
@@ -3815,7 +3742,6 @@ const POSPage = {
       if (this.current_order && this.current_order.id) this.voidOrder(this.current_order.id);
     });
     document.getElementById("btn-held").addEventListener("click", ()=>this.openHeldOrders());
-
     this.initCustomerPicker();
     this.initDeliveryPicker();
     this.refreshCategories();
@@ -3824,7 +3750,6 @@ const POSPage = {
     this.newOrder();
     this.updateCartFab();
   },
-
   openCartSheet(){
     document.getElementById("pos-cart").classList.add("open");
     const fab = document.getElementById("cart-fab");
@@ -3846,33 +3771,25 @@ const POSPage = {
     document.getElementById("cart-fab-count").textContent = String(count);
     document.getElementById("cart-fab-total").textContent = fmtMoney(total);
   },
-
   updateOrderHeader(){
     const lbl     = document.getElementById("pos-order-lbl");
     const holdBtn = document.getElementById("pos-hold");
     const voidBtn = document.getElementById("pos-void");
     const editing = !!(this.current_order && this.current_order.id);
-    if (lbl)     lbl.textContent = editing
-      ? (this.current_order.no || t("edit_order"))
-      : t("new_order");
+    if (lbl)     lbl.textContent = editing ? (this.current_order.no || t("edit_order")) : t("new_order");
     if (holdBtn) holdBtn.textContent = editing ? t("update_order") : t("hold");
     if (voidBtn) voidBtn.style.display = editing ? "inline-flex" : "none";
   },
-
   updateHeldBadge(){
     const orders = DB.openOrders();
     const badge = document.getElementById("nav-pos-badge");
     const heldCount = document.getElementById("held-count");
     if (heldCount) heldCount.textContent = String(orders.length);
     if (badge){
-      if (orders.length > 0){
-        badge.textContent = String(orders.length);
-        badge.style.display = "flex";
-      } else badge.style.display = "none";
+      if (orders.length > 0){ badge.textContent = String(orders.length); badge.style.display = "flex"; }
+      else badge.style.display = "none";
     }
   },
-
-  /* ── Held orders modal ───────────────────────────────── */
   openHeldOrders(){
     const render = ()=>{
       const orders = DB.openOrders();
@@ -3908,7 +3825,6 @@ const POSPage = {
         <div class="m-foot">
           <button class="btn primary" id="held-close">${escapeHtml(t("close"))}</button>
         </div>`);
-
       document.getElementById("held-close").addEventListener("click", ()=>Modal.close());
       document.getElementById("modal").querySelectorAll(".held-row").forEach(row=>{
         const id = Number(row.dataset.id);
@@ -3941,7 +3857,6 @@ const POSPage = {
     Modal.open("");
     render();
   },
-
   buildSnapshotFromHeld(o){
     return {
       id:o.id, no:o.order_no, type:o.order_type || "Delivery",
@@ -3956,8 +3871,6 @@ const POSPage = {
       delivery: o.delivery, total: o.total, payment_method: o.payment_method || "Cash",
     };
   },
-
-  /* ── Customer picker ─────────────────────────────────── */
   initCustomerPicker(){
     const input = document.getElementById("cust-input");
     const list  = document.getElementById("cust-list");
@@ -3996,12 +3909,9 @@ const POSPage = {
     const text = document.getElementById("cust-input").value.trim();
     if (!text) return { id:null, name:"", phone:"" };
     const c = DB.customers.find(x=>String(x.name||"").toLowerCase() === text.toLowerCase());
-    return c ? { id:c.id, name:c.name, phone:c.phone||"" }
-             : { id:null, name:text, phone:"" };
+    return c ? { id:c.id, name:c.name, phone:c.phone||"" } : { id:null, name:text, phone:"" };
   },
   setCustomer(id, name){ document.getElementById("cust-input").value = name || ""; },
-
-  /* ── Delivery picker ─────────────────────────────────── */
   initDeliveryPicker(){
     const input = document.getElementById("deliv-input");
     const list  = document.getElementById("deliv-list");
@@ -4019,12 +3929,10 @@ const POSPage = {
     const list  = document.getElementById("deliv-list");
     const input = document.getElementById("deliv-input");
     if (!list || !input) return;
-
     const cur = Math.max(0, Number(input.value) || 0);
     const choices = deliveryFeeChoices();
     if (!choices.includes(cur)) choices.push(cur);
     choices.sort((a,b)=>a-b);
-
     let html = "";
     for (const v of choices){
       const isFree = v === 0;
@@ -4036,7 +3944,6 @@ const POSPage = {
     html += `<div class="item" data-val="custom">
       <b>${escapeHtml(t("custom_fee"))}</b>
       <span class="ph">• ${escapeHtml(t("delivery_hint"))}</span></div>`;
-
     list.innerHTML = html;
     list.querySelectorAll(".item").forEach(el=>{
       el.addEventListener("click", ()=>{
@@ -4063,8 +3970,6 @@ const POSPage = {
     const v = Number(el.value);
     return Number.isFinite(v) && v >= 0 ? v : 0;
   },
-
-  /* ── Menu ────────────────────────────────────────────── */
   refreshCategories(){
     const bar = document.getElementById("pos-cats");
     if (!bar) return;
@@ -4098,7 +4003,6 @@ const POSPage = {
       </div>`;
     }
     grid.innerHTML = html;
-
     grid.querySelectorAll(".product-card").forEach(card=>{
       const id = Number(card.dataset.id);
       let lpTimer = null, longPressed = false;
@@ -4106,8 +4010,7 @@ const POSPage = {
         longPressed = false;
         if (lpTimer) clearTimeout(lpTimer);
         lpTimer = setTimeout(()=>{
-          lpTimer = null;
-          longPressed = true;
+          lpTimer = null; longPressed = true;
           ProductEditor.open(id, ()=>{ POSPage.renderProducts(); POSPage.refreshCategories(); });
         }, 600);
       });
@@ -4145,12 +4048,10 @@ const POSPage = {
     });
     this.renderCart(); this.recalc(); this.updateCartFab();
   },
-
   showOptionDialog(p){
     const groups = optionsFor(p);
     const state = { size:null, flavorSet:new Set(), groups:{}, qty:1, note:"", override:"" };
     const sym = DB.settings.currency_symbol;
-
     const collectChosen = ()=>{
       const chosen = [];
       const isLarge = state.size === "Large";
@@ -4178,7 +4079,6 @@ const POSPage = {
       }
       return chosen;
     };
-
     const rebuild = ()=>{
       const autoUnit = computeUnitPrice(p, collectChosen());
       let html = `<div class="m-head">
@@ -4269,9 +4169,6 @@ const POSPage = {
         });
       });
     };
-
-    // ── Flavor selection is optional, even for Large pizzas ──
-    // The customer may simply want a Large pizza with no flavor marked.
     const finalize = ()=>{
       const chosen = collectChosen();
       let unit = computeUnitPrice(p, chosen);
@@ -4284,8 +4181,6 @@ const POSPage = {
     Modal.open("");
     rebuild();
   },
-
-  /* ── Cart ────────────────────────────────────────────── */
   renderCart(){
     const wrap = document.getElementById("cart-list");
     if (!wrap || !this.current_order) return;
@@ -4386,8 +4281,6 @@ const POSPage = {
     if (gr)  gr.textContent    = fmtMoneyDual(grand, s);
     this.updateCartFab();
   },
-
-  /* ── Order tabs (unlimited, scroll horizontally) ─────── */
   renderTabs(){
     const bar = document.getElementById("pos-tabs");
     if (!bar) return;
@@ -4404,7 +4297,6 @@ const POSPage = {
         data-del="${o.id}" title="${escapeHtml(t("void_order"))}">✕</span></button>`;
     }
     bar.innerHTML = html;
-
     bar.querySelectorAll(".tab-del").forEach(sp=>{
       sp.addEventListener("click", e=>{
         e.stopPropagation();
@@ -4420,10 +4312,8 @@ const POSPage = {
         }
       });
     });
-
     this.updateHeldBadge();
   },
-
   loadOrder(o){
     this.current_order = {
       id:o.id, no:o.order_no, type:o.order_type || "Delivery",
@@ -4448,7 +4338,6 @@ const POSPage = {
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
     if (isMobile()) this.openCartSheet();
   },
-
   newOrder(){
     this.current_order = {
       id:null, no: DB.nextOrderNo(), type:"Delivery",
@@ -4461,7 +4350,6 @@ const POSPage = {
     this.updateOrderHeader();
     this.renderCart(); this.recalc(); this.renderTabs(); this.updateCartFab();
   },
-
   clearOrder(){
     if (!this.current_order) return;
     if (this.current_order.items.length && !confirm(t("clear_order_q"))) return;
@@ -4469,7 +4357,6 @@ const POSPage = {
     document.getElementById("disc-in").value = "0";
     this.renderCart(); this.recalc(); this.updateCartFab();
   },
-
   holdOrder(){
     if (!this.current_order || !this.current_order.items.length){
       toast(t("nothing_to_hold"), "warning"); return;
@@ -4485,7 +4372,6 @@ const POSPage = {
     this.newOrder();
     if (isMobile()) this.closeCartSheet();
   },
-
   voidOrder(id){
     const row = DB.orders.find(x=>x.id === id);
     if (!row) return;
@@ -4496,7 +4382,6 @@ const POSPage = {
     if (wasCurrent) this.newOrder();
     else this.renderTabs();
   },
-
   payOrder(){
     if (!this.current_order || !this.current_order.items.length){
       toast(t("cart_is_empty"), "warning"); return;
@@ -4533,7 +4418,6 @@ const POSPage = {
     });
     update();
   },
-
   async finalizePayment(){
     const { id, name, phone } = this.resolveCustomer();
     this.current_order.customer_id = id;
@@ -4541,11 +4425,9 @@ const POSPage = {
     this.current_order.customer_phone = phone;
     this.current_order.payment_method = "Cash";
     this.current_order.user_id = App.user ? App.user.id : null;
-
     DB.saveOrder(this.current_order, "paid");
     DB.deductStock(this.current_order);
     DB.saveAll();
-
     const snapshot = {
       id:this.current_order.id, no:this.current_order.no,
       type:this.current_order.type || "Delivery",
@@ -4558,9 +4440,7 @@ const POSPage = {
       tax:this.current_order.tax, delivery:this.current_order.delivery,
       total:this.current_order.total, payment_method:"Cash",
     };
-
     CloudSync.pushOrder(snapshot);
-
     const S = DB.settings;
     const auto = S.printer_auto === "1";
     if (auto){
@@ -4570,6 +4450,8 @@ const POSPage = {
         ReceiptDialog.show(snapshot);
       } else {
         toast(t("paid") + fmtMoney(snapshot.total), "success");
+        /* Even on success, offer an "edit / reprint" dialog briefly? No —
+           the receipt was already sent. Keep the flow quiet. */
       }
     } else {
       toast(t("paid") + fmtMoney(snapshot.total), "success");
@@ -4580,35 +4462,152 @@ const POSPage = {
   },
 };
 
-/* ═══════════════════ RECEIPT DIALOG ═══════════════════ */
+/* ═══════════════════ RECEIPT DIALOG (editable + reprint) ═══════════════════ */
 const ReceiptDialog = {
+  _order: null,
+  _edited: null,
   show(order){
-    const text = buildReceiptText(order, DB.settings, "CUSTOMER COPY");
+    this._order  = order;
+    this._edited = null;
+    this._render();
+  },
+  _defaultText(){
+    return buildReceiptText(this._order, DB.settings, "CUSTOMER COPY");
+  },
+  _render(){
     const S = DB.settings;
     const mode = (S.printer_mode || "browser").toLowerCase();
-    Modal.open(`<div class="m-head"><h1>${escapeHtml(t("receipt"))}</h1></div>
+    const copies = Printer.copies(S);
+    const text = (this._edited != null) ? this._edited : this._defaultText();
+    Modal.open(`
+      <div class="m-head"><h1>${escapeHtml(t("receipt"))}</h1></div>
       <div class="m-body">
-        <textarea id="rcpt-text" readonly
-          style="width:100%; height:min(60vh,400px); font-family:ui-monospace,monospace; font-size:12px;"
+        <div class="faint" style="font-size:11px; margin-bottom:6px;">
+          ✎ ${escapeHtml(t("edit_receipt_hint"))}
+        </div>
+        <textarea id="rcpt-text" spellcheck="false"
+          style="width:100%; height:min(60vh,420px); font-family:ui-monospace,monospace;
+                 font-size:12px; line-height:1.35;"
           >${escapeHtml(text)}</textarea>
         <div class="faint" style="font-size:11px; margin-top:8px;">
           ${escapeHtml(t("mode"))}: <b>${escapeHtml(mode)}</b> ·
           ${escapeHtml(t("cut"))}: <b>${escapeHtml(S.printer_cut||"partial")}</b> ·
-          ${escapeHtml(t("copies"))}: <b>${escapeHtml(String(S.printer_copies||"2"))}</b> ·
+          ${escapeHtml(t("copies"))}: <b>${escapeHtml(String(copies))}</b> ·
           ${escapeHtml(t("cut_each"))}: <b>${S.printer_cut_between === "0" ? "off" : "on"}</b> ·
           ${escapeHtml(t("drawer"))}: <b>${S.printer_drawer==="1"?"on":"off"}</b> ·
           ${escapeHtml(t("listener"))}: <b>${S.printer_store_listener === "1" ? "on" : "off"}</b>
         </div>
       </div>
       <div class="m-foot">
+        <button class="btn ghost" id="rcpt-reset">↺ ${escapeHtml(t("reset_receipt"))}</button>
         <button class="btn" id="rcpt-close">${escapeHtml(t("close"))}</button>
         <button class="btn success" id="rcpt-print">${escapeHtml(t("print_now"))}</button>
       </div>`);
+    const ta = document.getElementById("rcpt-text");
+    ta.addEventListener("input", ()=>{ this._edited = ta.value; });
     document.getElementById("rcpt-close").addEventListener("click", ()=>Modal.close());
-    document.getElementById("rcpt-print").addEventListener("click", async ()=>{
-      const res = await Printer.print(order, DB.settings);
-      if (res && res.ok) toast(t("print_job_sent"), "success");
+    document.getElementById("rcpt-reset").addEventListener("click", ()=>{
+      this._edited = null;
+      ta.value = this._defaultText();
     });
+    document.getElementById("rcpt-print").addEventListener("click", async ()=>{
+      this._edited = ta.value;
+      await this._printEdited(ta.value);
+    });
+  },
+  async _printEdited(text){
+    const S = DB.settings;
+    const mode    = (S.printer_mode || "browser").toLowerCase();
+    const copies  = Printer.copies(S);
+    const order   = this._order || {};
+
+    if (mode === "browser"){
+      const blocks = [];
+      for (let i = 0; i < copies; i++) blocks.push(text);
+      await Printer.printTextViaIframe(blocks);
+      toast(t("print_job_sent"), "success");
+      return { ok:true };
+    }
+
+    const bodyBytes = (()=>{
+      const p = new EscPos();
+      p.init();
+      p.bold(true); p.doubleStrike(true); p.align(0);
+      for (const line of String(text).split("\n")) p.line(line);
+      p.doubleStrike(false); p.bold(false);
+      return p.bytes();
+    })();
+
+    const perCopy = [];
+    for (let i = 0; i < copies; i++){
+      const cut = buildEscPosCut(S, { drawer: i === 0 && S.printer_drawer === "1" });
+      perCopy.push(concatBytes(bodyBytes, cut));
+    }
+
+    try{
+      if (mode === "usb"){
+        if (!USBPrinter.isConnected()){
+          const ok = await USBPrinter.autoReconnect();
+          if (!ok) throw new Error("USB printer not connected");
+        }
+        for (let i = 0; i < perCopy.length; i++){
+          await USBPrinter.send(perCopy[i]);
+          if (i < perCopy.length - 1) await sleep(1500);
+        }
+        toast(`🖨  Printed ${copies} ${copies===1?"copy":"copies"} (USB)`, "success");
+        return { ok:true };
+      }
+      if (mode === "agent"){
+        const url = (S.printer_agent_url || "").trim();
+        if (!url) throw new Error("Set the Print Agent URL in Settings");
+        const headers = { "Content-Type":"application/json" };
+        if (S.printer_agent_token) headers["X-Auth-Token"] = S.printer_agent_token;
+        const jobs = perCopy.map((b, i)=>({
+          label: i === 0 ? "CUSTOMER COPY" : "RESTAURANT COPY",
+          data: Array.from(b),
+        }));
+        const ctrl = new AbortController();
+        const timer = setTimeout(()=>ctrl.abort(), 15000);
+        let r;
+        try{
+          r = await fetch(url.replace(/\/+$/,"") + "/print", {
+            method:"POST", headers,
+            body: JSON.stringify({
+              printer: S.printer_name || "",
+              order_no: order.no || "",
+              cut: S.printer_cut || "partial",
+              cut_each: true,
+              drawer: S.printer_drawer === "1",
+              jobs,
+            }),
+            signal: ctrl.signal,
+          });
+        } finally { clearTimeout(timer); }
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        toast("🖨  Sent to agent", "success");
+        return { ok:true };
+      }
+      if (mode === "cloud"){
+        if (S.firebase_enabled !== "1") throw new Error("Firebase disabled in Settings");
+        if (!CloudDB.ready)             throw new Error("Cloud not connected");
+        const flat = [];
+        for (const b of perCopy){ for (let i = 0; i < b.length; i++) flat.push(b[i]); }
+        await CloudSync.queuePrintJob({
+          printer_name: S.printer_name || "",
+          order_no: order.no || "",
+          cut: S.printer_cut || "partial",
+          cut_each: true,
+          drawer: S.printer_drawer === "1",
+          copies, data: flat,
+        });
+        toast("☁  Print job queued — store printer will pick it up", "success");
+        return { ok:true };
+      }
+      return { ok:false };
+    }catch(e){
+      toast("Print failed: " + (e.message || e), "error", 6000);
+      return { ok:false, error: e.message };
+    }
   },
 };
 
@@ -4620,7 +4619,6 @@ const PricePrompt = {
     const qty  = Math.max(1, Number(opts.qty) || 1);
     const base = Number(opts.baseValue != null ? opts.baseValue : opts.value) || 0;
     const cur  = Number(opts.value) || 0;
-
     Modal.open(`
       <div class="m-head"><h1>${escapeHtml(opts.title || t("edit_line_price"))}</h1></div>
       <div class="m-body">
@@ -4640,7 +4638,6 @@ const PricePrompt = {
         <button class="btn" id="pp-cancel">${escapeHtml(t("cancel"))}</button>
         <button class="btn primary" id="pp-ok">${escapeHtml(t("apply"))}</button>
       </div>`);
-
     const inp  = document.getElementById("pp-val");
     const prev = document.getElementById("pp-prev");
     const upd = ()=>{
@@ -4876,7 +4873,6 @@ const ProductEditor = {
         .map(c=>({ label:String(c.label||"").trim(), price:Number(c.price)||0 }))
         .filter(c=>c.label),
     })).filter(g=>g.name && g.choices.length);
-
     const payload = {
       name: d.name, emoji: d.emoji || "🍕", category_id: d.category_id,
       price: Number(d.price)||0, cost: Number(d.cost)||0,
@@ -4967,9 +4963,8 @@ const CategoriesEditor = {
         const c = DB.categories.find(x=>x.id === id);
         if (!c) return;
         const used = DB.products.filter(p=>p.category_id === id).length;
-        const msg = used
-          ? `Delete "${c.name}"? ${used} product(s) will become uncategorised.`
-          : `Delete "${c.name}"?`;
+        const msg = used ? `Delete "${c.name}"? ${used} product(s) will become uncategorised.`
+                         : `Delete "${c.name}"?`;
         if (!confirm(msg)) return;
         for (const p of DB.products){
           if (p.category_id === id){ p.category_id = null; Persist.put("products", p); }
@@ -5304,11 +5299,14 @@ const ExpensesPage = {
 /* ═══════════════════ REPORTS PAGE ═══════════════════ */
 const ReportsPage = {
   from:null, to:null, initialized:false,
+  _activeQuick: "7",
+
   init(){
     if (this.initialized) return;
     this.initialized = true;
     this.from = addDaysStr(todayStr(), -7);
     this.to   = todayStr();
+    this._activeQuick = "7";
     const el = document.getElementById("page-reports");
     el.innerHTML = `
       <div class="page-head"><h1>${escapeHtml(t("reports"))}</h1></div>
@@ -5316,9 +5314,9 @@ const ReportsPage = {
         <label class="muted">${escapeHtml(t("from"))}</label><input type="date" id="rep-from">
         <label class="muted">${escapeHtml(t("to"))}</label><input type="date" id="rep-to">
         <button class="btn primary" id="rep-apply">${escapeHtml(t("apply"))}</button>
-        <button class="btn ghost" data-q="0">${escapeHtml(t("today"))}</button>
-        <button class="btn ghost" data-q="7">${escapeHtml(t("week"))}</button>
-        <button class="btn ghost" data-q="30">${escapeHtml(t("month"))}</button>
+        <button class="btn chip" data-q="0">${escapeHtml(t("today"))}</button>
+        <button class="btn chip" data-q="7">${escapeHtml(t("week"))}</button>
+        <button class="btn chip" data-q="30">${escapeHtml(t("month"))}</button>
       </div>
       <div class="cards-row" id="rep-cards"></div>
       <div class="report-grid">
@@ -5336,6 +5334,10 @@ const ReportsPage = {
         <h3>${escapeHtml(t("daily_sales"))}</h3>
         <table><thead><tr><th>${escapeHtml(t("date"))}</th><th>${escapeHtml(t("orders"))}</th><th>${escapeHtml(t("revenue"))}</th></tr></thead>
         <tbody id="rep-days"></tbody></table>
+      </div>
+      <div class="card report-box" style="margin-bottom:12px;">
+        <h3>${escapeHtml(t("recent_orders"))}</h3>
+        <div class="orders-list" id="rep-orders"></div>
       </div>
       <div class="card" style="padding:14px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -5356,17 +5358,27 @@ const ReportsPage = {
           <button class="btn danger" id="rep-reset">${escapeHtml(t("reset_reports"))}</button>
         </div>
       </div>`;
+
     document.getElementById("rep-from").value = this.from;
     document.getElementById("rep-to").value   = this.to;
-    document.getElementById("rep-from").addEventListener("change", e=>{ this.from = e.target.value; this.render(); });
-    document.getElementById("rep-to").addEventListener("change", e=>{ this.to = e.target.value; this.render(); });
-    document.getElementById("rep-apply").addEventListener("click", ()=>this.render());
+    document.getElementById("rep-from").addEventListener("change", e=>{
+      this.from = e.target.value; this._activeQuick = null; this._paintQuick(); this.render();
+    });
+    document.getElementById("rep-to").addEventListener("change", e=>{
+      this.to = e.target.value; this._activeQuick = null; this._paintQuick(); this.render();
+    });
+    document.getElementById("rep-apply").addEventListener("click", ()=>{
+      this._activeQuick = null; this._paintQuick(); this.render();
+    });
     el.querySelectorAll("[data-q]").forEach(b=>{
       b.addEventListener("click", ()=>{
-        this.from = addDaysStr(todayStr(), -Number(b.dataset.q));
+        const q = Number(b.dataset.q);
+        this.from = addDaysStr(todayStr(), -q);
         this.to = todayStr();
+        this._activeQuick = String(q);
         document.getElementById("rep-from").value = this.from;
         document.getElementById("rep-to").value = this.to;
+        this._paintQuick();
         this.render();
       });
     });
@@ -5387,8 +5399,19 @@ const ReportsPage = {
         POSPage.updateCartFab();
       });
     });
+
+    this._paintQuick();
     this.render();
   },
+
+  _paintQuick(){
+    const el = document.getElementById("page-reports");
+    if (!el) return;
+    el.querySelectorAll("[data-q]").forEach(b=>{
+      b.classList.toggle("active", String(this._activeQuick) === b.dataset.q);
+    });
+  },
+
   render(){
     const s = this.from, e = this.to;
     const settings = DB.settings;
@@ -5402,6 +5425,7 @@ const ReportsPage = {
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("discount"))}</div><div class="val">${fmtMoney(summ.discount, sym)}</div></div>
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("expenses"))}</div><div class="val">${fmtMoney(summ.expenses, sym)}</div></div>
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("net_profit"))}</div><div class="val">${fmtMoney(profit, sym)}</div></div>`;
+
     const tTop = document.getElementById("rep-top");
     if (tTop) tTop.innerHTML = DB.topProducts(s,e).map(r=>
       `<tr><td>${escapeHtml(r.name)}</td><td>${r.qty|0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
@@ -5414,6 +5438,54 @@ const ReportsPage = {
     const tDays = document.getElementById("rep-days");
     if (tDays) tDays.innerHTML = DB.salesByDay(s,e).map(r=>
       `<tr><td>${escapeHtml(r.day)}</td><td>${r.orders}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+
+    /* ── Recent Orders list — click a row (or the reprint icon) to
+       open an editable ReceiptDialog and re-print. ── */
+    const ordersEl = document.getElementById("rep-orders");
+    if (ordersEl){
+      const orders = DB.paidOrdersWithItems(s, e);
+      if (!orders.length){
+        ordersEl.innerHTML = `<div class="held-empty">${escapeHtml(t("no_orders_in_range"))}</div>`;
+      } else {
+        ordersEl.innerHTML = orders.map(o=>{
+          const num = String(o.order_no||"").split("-").pop();
+          const when = (o.created_at||"").slice(11,16);
+          const date = (o.created_at||"").slice(5,10);
+          return `<div class="order-item" data-id="${o.id}">
+            <div class="ono">#${escapeHtml(num)}</div>
+            <div class="ocust">${escapeHtml(o.customer_name || "—")}</div>
+            <div class="otime">${escapeHtml(date)} ${escapeHtml(when)}</div>
+            <div class="ototal">${fmtMoney(o.total, sym)}</div>
+            <div class="oact">
+              <button class="btn icon" data-act="receipt" title="${escapeHtml(t("view_receipt"))}">🧾</button>
+              <button class="btn icon" data-act="reprint" title="${escapeHtml(t("reprint"))}">🖨</button>
+            </div>
+          </div>`;
+        }).join("");
+        ordersEl.querySelectorAll(".order-item").forEach(row=>{
+          const id = Number(row.dataset.id);
+          row.addEventListener("click", e=>{
+            if (e.target.closest("button")) return;
+            ReportsPage._openReceipt(id);
+          });
+          row.querySelectorAll("button").forEach(b=>{
+            b.addEventListener("click", async ev=>{
+              ev.stopPropagation();
+              const act = b.dataset.act;
+              if (act === "receipt"){
+                ReportsPage._openReceipt(id);
+              } else if (act === "reprint"){
+                const snap = DB.buildReceiptSnapshot(id);
+                if (!snap){ toast("Order not found", "error"); return; }
+                const res = await Printer.print(snap, DB.settings);
+                if (res && res.ok) toast(t("print_job_sent"), "success");
+              }
+            });
+          });
+        });
+      }
+    }
+
     const cash = DB.cashSummary(s,e);
     const info = document.getElementById("rep-cc-info");
     if (info) info.innerHTML =
@@ -5424,6 +5496,12 @@ const ReportsPage = {
       `<span class="faint">(${fmtMoneySecondary(cash.expenses, settings)})</span><br>` +
       `<b>${escapeHtml(t("expected_drawer"))}:</b> ${fmtMoney(cash.expected, sym)} ` +
       `<span class="faint">(${fmtMoneySecondary(cash.expected, settings)})</span>`;
+  },
+
+  _openReceipt(orderId){
+    const snap = DB.buildReceiptSnapshot(orderId);
+    if (!snap){ toast("Order not found", "error"); return; }
+    ReceiptDialog.show(snap);
   },
 };
 
@@ -5503,6 +5581,15 @@ const SettingsPage = {
 
       <div class="card" style="padding:20px; margin-bottom:14px;">
         <h3 style="margin-bottom:8px;">${escapeHtml(t("thermal_printer"))}</h3>
+        <div class="form-row"><label>${escapeHtml(t("device_role"))}</label>
+          <div class="seg" id="s-role-seg">
+            <button data-role="store">${escapeHtml(t("role_store"))}</button>
+            <button data-role="remote">${escapeHtml(t("role_remote"))}</button>
+          </div>
+        </div>
+        <div class="faint" style="font-size:11px; line-height:1.6; margin:0 0 12px;">
+          ${escapeHtml(t("device_role_hint"))}
+        </div>
         <div class="form-row"><label>${escapeHtml(t("printer_mode"))}</label>
           <div class="seg" id="s-mode-seg">
             <button data-mode="browser">browser</button>
@@ -5625,11 +5712,18 @@ const SettingsPage = {
         currentMode = b.dataset.mode;
         S.printer_mode = currentMode;
         DB.save("settings");
-        Persist.putObject("settings", S);
         paintSeg();
         refreshDiag();
       });
     });
+
+    const roleSeg = $("s-role-seg");
+    const paintRoleSeg = ()=>{
+      const role = STORE.get("device_role", "");
+      roleSeg.querySelectorAll("button").forEach(b=>
+        b.classList.toggle("on", b.dataset.role === role));
+    };
+    paintRoleSeg();
 
     const refreshPill = ()=>{
       const pill = document.getElementById("printer-pill");
@@ -5753,6 +5847,38 @@ const SettingsPage = {
       refreshAll();
     }, 1500);
 
+    roleSeg.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const role = b.dataset.role;
+        STORE.set("device_role", role);
+        if (role === "store"){
+          DB.settings.printer_store_listener = "1";
+          DB.settings.printer_mode           = "browser";
+        } else if (role === "remote"){
+          DB.settings.printer_store_listener = "0";
+          DB.settings.printer_mode           = "cloud";
+        }
+        DB.save("settings");
+        S.printer_mode           = DB.settings.printer_mode;
+        S.printer_store_listener = DB.settings.printer_store_listener;
+        currentMode = S.printer_mode;
+        $("s-store-listener").checked = S.printer_store_listener === "1";
+        paintSeg(); paintRoleSeg();
+        if (S.printer_store_listener === "1"){
+          if (S.firebase_enabled !== "1"){
+            toast(t("listener_needs_fb"), "warning", 5000);
+          } else {
+            PrintListener.restart();
+            toast(t("listener_on"), "success");
+          }
+        } else {
+          PrintListener.stop();
+        }
+        refreshAll();
+        toast(role === "store" ? t("role_store_applied") : t("role_remote_applied"), "success");
+      });
+    });
+
     const pill = document.getElementById("printer-pill");
     if (pill && !pill._bound){
       pill._bound = true;
@@ -5797,9 +5923,7 @@ const SettingsPage = {
       Persist.putObject("settings", S);
       toast(t("settings_saved"), "success");
       if (newTheme !== oldTheme) App.applyTheme(newTheme);
-      if (newLang !== oldLang){
-        I18n.apply(newLang);
-      }
+      if (newLang !== oldLang) I18n.apply(newLang);
       POSPage.refreshCategories(); POSPage.renderProducts(); POSPage.recalc();
     });
 
@@ -5823,14 +5947,9 @@ const SettingsPage = {
       const on = $("s-store-listener").checked ? "1" : "0";
       S.printer_store_listener = on;
       DB.save("settings");
-      Persist.putObject("settings", S);
       if (on){
-        if (S.firebase_enabled !== "1"){
-          toast(t("listener_needs_fb"), "warning", 5000);
-        } else {
-          PrintListener.restart();
-          toast(t("listener_on"), "success");
-        }
+        if (S.firebase_enabled !== "1"){ toast(t("listener_needs_fb"), "warning", 5000); }
+        else { PrintListener.restart(); toast(t("listener_on"), "success"); }
       } else {
         PrintListener.stop();
         toast(t("listener_off"), "info");
@@ -5852,9 +5971,7 @@ const SettingsPage = {
           data: Array.from(bytes),
         });
         toast(t("test_job_queued"), "success", 5000);
-      }catch(e){
-        toast(t("queue_failed") + e.message, "error", 6000);
-      }
+      }catch(e){ toast(t("queue_failed") + e.message, "error", 6000); }
       refreshAll();
     });
 
@@ -5907,21 +6024,15 @@ const SettingsPage = {
       toast(t("uploading"), "info", 4000);
     });
 
-    /* ── UPDATED: full step-by-step diagnostic test ───────────── */
     $("s-test-fb").addEventListener("click", async ()=>{
       const diag = await CloudDB.diagnose();
       const lines = diag.steps.map(s =>
         (s.ok ? "✅ " : "❌ ") + s.name + (s.info ? "  —  " + s.info : "")
       ).join("\n");
-
-      // Echo into the on-screen diagnostics panel too
       const el = $("s-diag-sync");
       if (el) el.textContent = lines;
-
-      if (diag.ok){
-        toast("Cloud connection OK", "success");
-      } else {
-        // Show the first failing step in a modal so it's impossible to miss
+      if (diag.ok) toast("Cloud connection OK", "success");
+      else {
         const bad = diag.steps.find(s => !s.ok);
         toast("Failed: " + (bad ? bad.name + " — " + bad.info : "unknown"), "error", 8000);
       }
@@ -5936,7 +6047,6 @@ const SettingsPage = {
       }catch(e){
         const msg = e.message || String(e);
         toast("USB connect failed: " + msg, "error", 6000);
-        // Access-denied / claim / config errors are almost always driver-related.
         if (/access denied|claim|configuration|no out endpoint/i.test(msg)){
           setTimeout(()=>USBPrinter.showHelp(msg), 400);
         }
@@ -5966,9 +6076,8 @@ const SettingsPage = {
         const ctrl = new AbortController();
         const timer = setTimeout(()=>ctrl.abort(), 8000);
         let r;
-        try{
-          r = await fetch(url.replace(/\/+$/,"") + "/health", { method:"GET", signal: ctrl.signal });
-        } finally { clearTimeout(timer); }
+        try{ r = await fetch(url.replace(/\/+$/,"") + "/health", { method:"GET", signal: ctrl.signal }); }
+        finally { clearTimeout(timer); }
         if (r.ok) toast("Agent reachable (" + r.status + ")", "success");
         else toast("Agent responded " + r.status, "warning");
       }catch(e){
@@ -6054,7 +6163,7 @@ function sampleReceipt(){
   };
 }
 
-/* ═══════════════════ FIREBASE REST (reporting push) ═══════════════════ */
+/* ═══════════════════ FIREBASE REST ═══════════════════ */
 function _firestoreValue(v){
   if (v === null || v === undefined) return { nullValue:null };
   if (typeof v === "boolean") return { booleanValue: v };
@@ -6366,6 +6475,17 @@ const App = {
     const status = document.getElementById("login-cloud");
     await DB.load(msg => { if (status) status.textContent = msg ? "☁ " + msg : ""; });
 
+    /* Local device role — must never be overwritten by the cloud. */
+    const localRole = STORE.get("device_role", "");
+    if (localRole === "store"){
+      DB.settings.printer_store_listener = "1";
+      DB.settings.printer_mode           = "browser";
+    } else if (localRole === "remote"){
+      DB.settings.printer_store_listener = "0";
+      DB.settings.printer_mode           = "cloud";
+    }
+    DB.save("settings");
+
     I18n.apply(DB.settings.language || "en");
     this.applyTheme(DB.settings.theme || "light");
     this.bindLogin();
@@ -6565,283 +6685,6 @@ window.addEventListener("DOMContentLoaded", ()=>{
     }catch(e){}
   });
 });
-/* ═══════════════════════════════════════════════════════════════
-   BOLD RECEIPT OVERRIDE
-   Forces every receipt to print bold in ALL modes:
-     • Browser   → heavy CSS (Consolas + 700 + text-stroke)
-     • USB/Agent → bold + double-strike on every ESC/POS line
-     • Cloud     → same buffer as USB/Agent, queued remotely
-   ═══════════════════════════════════════════════════════════════ */
-(function(){
-  "use strict";
-
-  if (typeof EscPos === "undefined" || typeof Printer === "undefined"){
-    console.error("[Bold Receipt] EscPos or Printer not found — aborting.");
-    return;
-  }
-
-  /* ── 1. Add double-strike to EscPos (darker than bold alone) ── */
-  EscPos.prototype.doubleStrike = function(on){
-    return this._u8(0x1B, 0x47, on ? 1 : 0);   // ESC G n
-  };
-
-  /* ── 2. Rebuild the ESC/POS body — bold + double-strike ─────── */
-  const newBuildEscPosBody = function(order, settings, copyLabel){
-    const sym = settings.currency_symbol || "LBP ";
-    const p = new EscPos();
-
-    p.init();
-    p.bold(true);            // ← bold ON, stays on for every line
-    p.doubleStrike(true);    // ← double-strike ON (extra darkness)
-
-    /* Header */
-    p.align(1);
-    if (settings.restaurant_name){
-      p.size(1,1);
-      p.line(settings.restaurant_name);
-      p.size(0,0);
-    }
-    if (settings.tagline) p.line(settings.tagline);
-    if (settings.address) p.line(settings.address);
-    if (settings.phone)   p.line(settings.phone);
-
-    p.align(0);
-    p.line(sep("-"));
-
-    if (copyLabel){
-      p.align(1);
-      p.line("*** " + copyLabel + " ***");
-      p.align(0);
-      p.line(sep("-"));
-    }
-
-    const when = new Date().toLocaleString([], { hour12:false });
-    p.line(lr("Order: " + order.no, when));
-    if (order.customer_name)  p.line("Customer: " + order.customer_name);
-    if (order.customer_phone) p.line("Phone: " + order.customer_phone);
-    p.line("Type: " + (order.type || "Delivery"));
-    p.line(sep("-"));
-
-    /* Items */
-    for (const it of order.items){
-      p.line(it.name);
-      const opts = (it.options||[]).map(o=>o.label).join(", ");
-      if (opts) p.line("  " + opts);
-      if (it.note) p.line("  Note: " + it.note);
-      p.line(lr("  " + it.qty + " x " + fmtMoney(it.unit, sym),
-                fmtMoney(it.line, sym)));
-    }
-
-    p.line(sep("-"));
-    p.line(lr("Subtotal", fmtMoney(order.subtotal, sym)));
-    if (order.discount) p.line(lr("Discount", "-" + fmtMoney(order.discount, sym)));
-    if (order.delivery) p.line(lr("Delivery", fmtMoney(order.delivery, sym)));
-    else                p.line(lr("Delivery", "FREE"));
-
-    /* Grand total — extra big */
-    p.line(sep("="));
-    p.size(1,1);
-    p.line(lr("TOTAL", fmtMoney(order.total, sym)));
-    p.size(0,0);
-
-    const rate = Number(settings.secondary_rate)||90000;
-    const sec  = (settings.secondary_currency||"USD").toUpperCase();
-    const secSym = sec === "USD" ? "$" : sec + " ";
-    if (rate){
-      p.align(1);
-      p.line(secSym + (Number(order.total)/rate).toFixed(2) + "  @ " + rate.toFixed(0));
-      p.align(0);
-    }
-    p.line(sep("="));
-
-    p.line(lr("Payment", order.payment_method || "Cash"));
-    p.line(sep("-"));
-    if (settings.receipt_footer){
-      p.align(1); p.line(settings.receipt_footer); p.align(0);
-    }
-
-    p.doubleStrike(false);
-    p.bold(false);
-    return p.bytes();
-  };
-
-  /* Overwrite both the scope binding and the window property */
-  try { buildEscPosBody = newBuildEscPosBody; } catch(e){}
-  try { window.buildEscPosBody = newBuildEscPosBody; } catch(e){}
-
-  /* ── 3. Heavy CSS for browser-mode iframe printing ──────────── */
-  Printer.printTextViaIframe = async function(blocks){
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-      html,body{margin:0;padding:0;background:#fff;color:#000;}
-
-      .receipt-copy{
-        /* Consolas / Menlo have genuine heavy weights */
-        font-family:'Consolas','Menlo','DejaVu Sans Mono',
-                    'Courier New',ui-monospace,monospace;
-        font-size:12px;
-        font-weight:700;
-        /* Extra weight on every glyph — turns thin fonts solid black */
-        -webkit-text-stroke:0.35px #000;
-        text-shadow:0 0 0.6px #000, 0 0 0.4px #000;
-        line-height:1.35;
-        letter-spacing:0.1px;
-        white-space:pre;
-        padding:6mm 4mm;
-        page-break-after:always;
-        -webkit-font-smoothing:none;
-      }
-      .receipt-copy:last-child{ page-break-after:auto; }
-
-      @media print{
-        @page{ size:80mm auto; margin:0; }
-        .receipt-copy{
-          -webkit-text-stroke:0.35px #000;
-          text-shadow:0 0 0.6px #000;
-        }
-      }
-    </style></head><body>${
-      blocks.map(b => `<div class="receipt-copy">${escapeHtml(b)}</div>`).join("")
-    }</body></html>`;
-
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.cssText =
-      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
-    document.body.appendChild(iframe);
-
-    try{
-      const doc = iframe.contentDocument || iframe.contentWindow.document;
-      doc.open(); doc.write(html); doc.close();
-      await new Promise(r=>setTimeout(r, 250));
-      const w = iframe.contentWindow;
-      w.focus(); w.print();
-      setTimeout(()=>{ try{ iframe.remove(); }catch(e){} }, 2500);
-    }catch(e){
-      try{ iframe.remove(); }catch(_){}
-      const area = document.getElementById("receipt-area");
-      area.innerHTML = blocks.map(b =>
-        `<div class="receipt-copy">${escapeHtml(b + "\n\n\n\n")}</div>`
-      ).join("");
-      setTimeout(()=>window.print(), 80);
-    }
-  };
-
-  /* ── 4. Same treatment for printText (Close Cash / test) ────── */
-  const _iframePrinter = Printer.printTextViaIframe;
-  Printer.printText = async function(text, settings){
-    const mode = (settings.printer_mode || "browser").toLowerCase();
-
-    if (mode === "browser"){
-      await _iframePrinter.call(Printer, [text]);
-      return { ok:true };
-    }
-
-    const p = new EscPos();
-    p.init();
-    p.bold(true);
-    p.doubleStrike(true);
-    p.align(0);
-    for (const line of String(text).split("\n")) p.line(line);
-    if (settings.printer_drawer === "1") p.kickDrawer();
-    p.cut(settings.printer_cut || "partial");
-    p.doubleStrike(false);
-    p.bold(false);
-    const bytes = p.bytes();
-
-    if (mode === "usb"){
-      if (!USBPrinter.isConnected()){
-        const ok = await USBPrinter.autoReconnect();
-        if (!ok){ toast("USB printer not connected","warning"); return { ok:false }; }
-      }
-      try{
-        await USBPrinter.send(bytes);
-        toast("🖨  Printed (USB)","success");
-        return { ok:true };
-      }catch(e){
-        toast("USB print failed: " + e.message,"error",5000);
-        return { ok:false };
-      }
-    }
-
-    if (mode === "agent"){
-      const url = (settings.printer_agent_url || "").trim();
-      if (!url){ toast("Set Print Agent URL","warning"); return { ok:false }; }
-      try{
-        const headers = { "Content-Type":"application/json" };
-        if (settings.printer_agent_token)
-          headers["X-Auth-Token"] = settings.printer_agent_token;
-        const ctrl = new AbortController();
-        const timer = setTimeout(()=>ctrl.abort(), 12000);
-        let r;
-        try{
-          r = await fetch(url.replace(/\/+$/,"") + "/print", {
-            method:"POST", headers,
-            body: JSON.stringify({
-              printer: settings.printer_name || "",
-              order_no: "CLOSE-CASH",
-              cut: settings.printer_cut || "partial",
-              cut_each: false,
-              drawer: settings.printer_drawer === "1",
-              jobs: [{ label:"CLOSE CASH", data: Array.from(bytes) }],
-            }),
-            signal: ctrl.signal,
-          });
-        } finally { clearTimeout(timer); }
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        toast("🖨  Sent to agent","success");
-        return { ok:true };
-      }catch(e){
-        toast("Print agent failed: " + e.message,"error",5000);
-        return { ok:false };
-      }
-    }
-
-    if (mode === "cloud"){
-      if (settings.firebase_enabled !== "1"){
-        toast("Cloud print needs Firebase","warning");
-        return { ok:false };
-      }
-      if (!CloudDB.ready){
-        toast("Cloud not connected","error");
-        return { ok:false };
-      }
-      try{
-        await CloudSync.queuePrintJob({
-          printer_name: settings.printer_name || "",
-          order_no: "CLOSE-CASH",
-          cut: settings.printer_cut || "partial",
-          cut_each: false,
-          drawer: settings.printer_drawer === "1",
-          copies: 1, data: Array.from(bytes),
-        });
-        toast("☁  Close Cash queued","success");
-        return { ok:true };
-      }catch(e){
-        toast("Cloud print failed: " + e.message,"error",5000);
-        return { ok:false };
-      }
-    }
-
-    await _iframePrinter.call(Printer, [text]);
-    return { ok:true };
-  };
-
-  /* ── 5. Console confirmation ────────────────────────────────── */
-  console.log(
-    "%c[Bold Receipt] override installed — every receipt is now bold.",
-    "background:#0f172a;color:#f8fafc;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
-  );
-  console.log("  • Browser:  Consolas/Menlo + weight 700 + text-stroke");
-  console.log("  • Thermal:  bold + double-strike on every line");
-  console.log(
-    "%c[Remote Print] fix installed — remote cloud jobs print 2 separated copies automatically.",
-    "background:#16a34a;color:#fff;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
-  );
-  console.log(
-    "%c[Large Pizza] flavor selection is now optional.",
-    "background:#f59e0b;color:#fff;padding:3px 8px;border-radius:4px;font-weight:700;font-size:13px"
-  );
-})();
 </script>
 </body>
 </html>
