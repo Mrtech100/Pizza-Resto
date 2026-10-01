@@ -687,6 +687,15 @@ const I18N = {
     order_detail: "Order Detail",
     line_items: "Line Items",
     no_items: "No items.",
+    order_edit: "Edit Order",
+    edit_order_hint: "Changes apply to reports on all devices.",
+    delete_order: "Delete Order",
+    delete_order_q: "Delete this order permanently?\n\nIt will be removed from reports on all devices, and its items are returned to stock. This cannot be undone.",
+    order_deleted: "Order deleted — reports updated",
+    order_updated_report: "Order updated — reports refreshed",
+    line_items_edit: "Line items",
+    payment_method: "Payment method",
+    add_line: "+ Add line",
 
     settings: "Settings",
     install_pwa: "📲  Install as an App (PWA)",
@@ -953,6 +962,15 @@ const I18N = {
     order_detail: "تفاصيل الطلب",
     line_items: "بنود الطلب",
     no_items: "لا توجد بنود.",
+    order_edit: "تعديل الطلب",
+    edit_order_hint: "تُطبَّق التغييرات على التقارير في جميع الأجهزة.",
+    delete_order: "حذف الطلب",
+    delete_order_q: "هل تريد حذف هذا الطلب نهائياً؟\n\nسيُحذف من التقارير على جميع الأجهزة، وتُعاد أصنافه إلى المخزون. لا يمكن التراجع.",
+    order_deleted: "تم حذف الطلب — تم تحديث التقارير",
+    order_updated_report: "تم تحديث الطلب — تم تحديث التقارير",
+    line_items_edit: "بنود الطلب",
+    payment_method: "طريقة الدفع",
+    add_line: "+ إضافة بند",
 
     settings: "الإعدادات",
     install_pwa: "📲  التثبيت كتطبيق (PWA)",
@@ -2211,8 +2229,7 @@ const DB = {
       const item = {
         id:newId(),
         order_id: oid, product_id: it.product_id, name: it.name,
-        qty: it.qty, unit_price: it.unit,
-        options: (it.options||[]).map(x=>x.label).join(", "),
+        qty: it.qty, unit_price: it.unit, options: (it.options||[]).map(x=>x.label).join(", "),
         note: it.note||"",
         line_total: it.line,
       };
@@ -2237,6 +2254,64 @@ const DB = {
     this.saveAll();
     return true;
   },
+  /* ─────────── REPORT ORDER EDIT / DELETE ─────────── */
+
+  /* Update the header fields of an existing order. */
+  updateOrder(id, patch){
+    const row = this.orders.find(x=>x.id === id);
+    if (!row) return false;
+    Object.assign(row, patch);
+    Persist.put("orders", row);
+    this.save("orders");
+    return true;
+  },
+
+  /* Replace every line item of an order (old lines are deleted everywhere). */
+  replaceOrderItems(orderId, items){
+    const old = this.order_items.filter(i => i.order_id === orderId);
+    this.order_items = this.order_items.filter(i => i.order_id !== orderId);
+    for (const it of old) Persist.remove("order_items", it.id);
+    for (const it of items){
+      this.order_items.push(it);
+      Persist.put("order_items", it);
+    }
+    this.save("order_items");
+  },
+
+  /* Permanently delete a paid order and optionally return its items to stock. */
+  deletePaidOrder(id, opts){
+    opts = opts || {};
+    const row = this.orders.find(x=>x.id === id);
+    if (!row) return false;
+    const lines = this.order_items.filter(i => i.order_id === id);
+
+    if (opts.restock !== false){
+      for (const it of lines){
+        if (it.product_id == null) continue;
+        const p = this.getProduct(it.product_id);
+        if (!p || !p.track_stock) continue;
+        const qty = Number(it.qty)||0;
+        if (!qty) continue;
+        p.stock = Number(p.stock||0) + qty;
+        this.save("products");
+        const mv = {
+          id:newId(), product_id:p.id, change:qty,
+          reason:"Delete " + (row.order_no||""), created_at: nowIso(),
+        };
+        this.stock_moves.push(mv);
+        Persist.put("stock_moves", mv);
+        Persist.adjustStock(p.id, qty);
+      }
+    }
+
+    this.orders      = this.orders.filter(x=>x.id !== id);
+    this.order_items = this.order_items.filter(i => i.order_id !== id);
+    for (const it of lines) Persist.remove("order_items", it.id);
+    Persist.remove("orders", id);
+    this.saveAll();
+    return true;
+  },
+
   deductStock(o){
     for (const it of o.items){
       const p = this.getProduct(it.product_id);
@@ -4450,8 +4525,6 @@ const POSPage = {
         ReceiptDialog.show(snapshot);
       } else {
         toast(t("paid") + fmtMoney(snapshot.total), "success");
-        /* Even on success, offer an "edit / reprint" dialog briefly? No —
-           the receipt was already sent. Keep the flow quiet. */
       }
     } else {
       toast(t("paid") + fmtMoney(snapshot.total), "success");
@@ -4664,6 +4737,237 @@ const PricePrompt = {
     });
     upd();
     try{ inp.focus(); inp.select(); }catch(e){}
+  },
+};
+
+/* ═══════════════════ ORDER EDITOR (Reports) ═══════════════════ */
+const OrderEditor = {
+  _id:null, _row:null, _items:[], _onDone:null, _calc:null,
+
+  open(orderId, onDone){
+    const row = DB.orders.find(o => o.id === orderId);
+    if (!row){ toast("Order not found", "error"); return; }
+    this._id = orderId;
+    this._row = cloneJson(row);
+    this._items = DB.order_items
+      .filter(i => i.order_id === orderId)
+      .map(i => cloneJson(i));
+    this._onDone = onDone || null;
+    Modal.open(this._shell());
+    this._bind();
+    this._recalc();
+  },
+
+  _shell(){
+    const o = this._row;
+    const num = String(o.order_no||"").split("-").pop();
+    const when = (o.created_at||"").replace("T"," ").slice(0,16);
+    const pay = o.payment_method || "Cash";
+    return `
+      <div class="m-head">
+        <h2>✏️ ${escapeHtml(t("order_edit"))} #${escapeHtml(num)}</h2>
+        <button class="btn ghost" id="oe-x">✕</button>
+      </div>
+      <div class="m-body">
+        <div class="faint" style="font-size:11px; margin-bottom:10px;">
+          ${escapeHtml(o.order_no||"")} · ${escapeHtml(when)} · ${escapeHtml(t("edit_order_hint"))}
+        </div>
+        <div class="two-col">
+          <div class="form-row"><label>${escapeHtml(t("name"))}</label>
+            <input id="oe-name" value="${escapeHtml(o.customer_name||"")}"></div>
+          <div class="form-row"><label>${escapeHtml(t("phone"))}</label>
+            <input id="oe-phone" value="${escapeHtml(o.customer_phone||"")}"></div>
+        </div>
+        <div class="form-row"><label>${escapeHtml(t("payment_method"))}</label>
+          <select id="oe-pay">
+            <option value="Cash" ${pay==="Cash"?"selected":""}>Cash</option>
+            <option value="Card" ${pay==="Card"?"selected":""}>Card</option>
+            <option value="Other" ${pay==="Other"?"selected":""}>Other</option>
+          </select></div>
+        <hr class="sep">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3 style="flex:1;">${escapeHtml(t("line_items_edit"))}</h3>
+          <button class="btn" id="oe-add">${escapeHtml(t("add_line"))}</button>
+        </div>
+        <div id="oe-items" style="margin-top:8px;"></div>
+        <hr class="sep">
+        <div class="totals">
+          <div class="row"><span class="muted">${escapeHtml(t("subtotal"))}</span><span id="oe-sub">0</span></div>
+          <div class="row disc"><span class="muted">${escapeHtml(t("discount"))}</span>
+            <input type="number" id="oe-disc" min="0" step="1000" value="${Number(o.discount)||0}"></div>
+          <div class="row"><span class="muted">${escapeHtml(t("delivery"))}</span>
+            <input type="number" id="oe-deliv" min="0" step="1000" value="${Number(o.delivery)||0}"
+                   style="width:110px; text-align:right; padding:5px 6px; font-size:11px;"></div>
+          <hr class="sep">
+          <div class="row grand"><span>${escapeHtml(t("total"))}</span><span id="oe-total">0</span></div>
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="btn danger" id="oe-del">🗑 ${escapeHtml(t("delete"))}</button>
+        <button class="btn" id="oe-cancel">${escapeHtml(t("cancel"))}</button>
+        <button class="btn primary" id="oe-save">${escapeHtml(t("save"))}</button>
+      </div>`;
+  },
+
+  _bind(){
+    const $ = id => document.getElementById(id);
+    $("oe-x").addEventListener("click", ()=>Modal.close());
+    $("oe-cancel").addEventListener("click", ()=>Modal.close());
+    $("oe-disc").addEventListener("input", ()=>this._recalc());
+    $("oe-deliv").addEventListener("input", ()=>this._recalc());
+    $("oe-add").addEventListener("click", ()=>{
+      this._items.push({
+        id:null, order_id:this._id, product_id:null, name:"", qty:1,
+        unit_price:0, options:"", note:"", line_total:0,
+      });
+      this._renderItems();
+      this._recalc();
+    });
+    $("oe-del").addEventListener("click", ()=>this._delete());
+    $("oe-save").addEventListener("click", ()=>this._save());
+    this._renderItems();
+  },
+
+  _renderItems(){
+    const host = document.getElementById("oe-items");
+    if (!host) return;
+    if (!this._items.length){
+      host.innerHTML = `<div class="faint" style="padding:6px 0;">${escapeHtml(t("no_items"))}</div>`;
+      return;
+    }
+    const sym = DB.settings.currency_symbol;
+    host.innerHTML = this._items.map((it, idx)=>`
+      <div class="oe-line" data-idx="${idx}"
+           style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+        <input data-k="name" value="${escapeHtml(it.name||"")}" style="flex:2; min-width:80px;">
+        <input data-k="qty" type="number" min="1" step="1"
+               value="${Number(it.qty)||1}" style="width:62px;">
+        <input data-k="unit_price" type="number" min="0" step="1000"
+               value="${Number(it.unit_price)||0}" style="width:112px;">
+        <span class="oe-line-total faint"
+              style="min-width:88px; text-align:right; font-weight:700; font-size:11px;">
+          ${escapeHtml(fmtMoney((Number(it.qty)||0)*(Number(it.unit_price)||0), sym))}</span>
+        <button class="btn icon" data-remove="${idx}" style="color:var(--danger);">✕</button>
+      </div>`).join("");
+
+    host.querySelectorAll(".oe-line").forEach(line=>{
+      const idx = Number(line.dataset.idx);
+      line.querySelectorAll("input[data-k]").forEach(inp=>{
+        inp.addEventListener("input", ()=>{
+          const it = this._items[idx];
+          if (!it) return;
+          const k = inp.dataset.k;
+          if (k === "name") it.name = inp.value;
+          else if (k === "qty") it.qty = Math.max(1, Number(inp.value)||1);
+          else if (k === "unit_price") it.unit_price = Math.max(0, Number(inp.value)||0);
+          const tot = line.querySelector(".oe-line-total");
+          if (tot) tot.textContent =
+            fmtMoney((Number(it.qty)||0)*(Number(it.unit_price)||0), sym);
+          this._recalc();
+        });
+      });
+    });
+    host.querySelectorAll("[data-remove]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        this._items.splice(Number(b.dataset.remove), 1);
+        this._renderItems();
+        this._recalc();
+      });
+    });
+  },
+
+  _recalc(){
+    const $ = id => document.getElementById(id);
+    const subtotal = this._items.reduce((a,it)=>
+      a + (Number(it.qty)||0)*(Number(it.unit_price)||0), 0);
+    const disc  = Math.max(0, Number(($("oe-disc") ||{}).value)||0);
+    const deliv = Math.max(0, Number(($("oe-deliv")||{}).value)||0);
+    const total = Math.max(0, subtotal - disc) + deliv;
+    if ($("oe-sub"))   $("oe-sub").textContent   = fmtMoneyDual(subtotal, DB.settings);
+    if ($("oe-total")) $("oe-total").textContent = fmtMoneyDual(total, DB.settings);
+    this._calc = { subtotal, discount:disc, delivery:deliv, total };
+    return this._calc;
+  },
+
+  _applyStockDelta(oldItems, newItems){
+    const map = new Map();
+    for (const it of oldItems){
+      if (it.product_id == null) continue;
+      map.set(it.product_id, (map.get(it.product_id)||0) + (Number(it.qty)||0));
+    }
+    for (const it of newItems){
+      if (it.product_id == null) continue;
+      map.set(it.product_id, (map.get(it.product_id)||0) - (Number(it.qty)||0));
+    }
+    for (const [pid, delta] of map){
+      if (!delta) continue;
+      const p = DB.getProduct(pid);
+      if (!p || !p.track_stock) continue;
+      p.stock = Number(p.stock||0) + delta;
+      DB.save("products");
+      const mv = {
+        id:newId(), product_id:pid, change:delta,
+        reason:"Edit " + (this._row.order_no||""), created_at: nowIso(),
+      };
+      DB.stock_moves.push(mv);
+      Persist.put("stock_moves", mv);
+      Persist.adjustStock(pid, delta);
+    }
+  },
+
+  _save(){
+    const c = this._recalc();
+    const row = DB.orders.find(o => o.id === this._id);
+    if (!row){ toast("Order not found", "error"); return; }
+
+    const items = [];
+    for (const it of this._items){
+      const qty  = Math.max(1, Number(it.qty)||1);
+      const unit = Math.max(0, Number(it.unit_price)||0);
+      items.push({
+        id: it.id || newId(),
+        order_id: this._id,
+        product_id: (it.product_id != null ? it.product_id : null),
+        name: String(it.name||"").trim() || "Item",
+        qty, unit_price: unit,
+        options: it.options || "",
+        note: it.note || "",
+        line_total: qty * unit,
+      });
+    }
+    if (!items.length){ toast(t("no_items"), "warning"); return; }
+
+    const oldItems = DB.order_items
+      .filter(i => i.order_id === this._id)
+      .map(i => cloneJson(i));
+    try{ this._applyStockDelta(oldItems, items); }
+    catch(e){ console.warn("stock delta failed:", e); }
+
+    DB.updateOrder(this._id, {
+      customer_name:  (document.getElementById("oe-name").value||"").trim(),
+      customer_phone: (document.getElementById("oe-phone").value||"").trim(),
+      payment_method: document.getElementById("oe-pay").value || "Cash",
+      subtotal: c.subtotal,
+      discount: c.discount,
+      delivery: c.delivery,
+      tax: Number(row.tax)||0,
+      total: c.total,
+    });
+    DB.replaceOrderItems(this._id, items);
+    DB.saveAll();
+
+    Modal.close();
+    toast(t("order_updated_report"), "success");
+    if (this._onDone) this._onDone();
+  },
+
+  _delete(){
+    if (!confirm(t("delete_order_q"))) return;
+    const ok = DB.deletePaidOrder(this._id, { restock:true });
+    if (!ok){ toast("Order not found", "error"); return; }
+    Modal.close();
+    toast(t("order_deleted"), "success");
+    if (this._onDone) this._onDone();
   },
 };
 
@@ -5439,8 +5743,8 @@ const ReportsPage = {
     if (tDays) tDays.innerHTML = DB.salesByDay(s,e).map(r=>
       `<tr><td>${escapeHtml(r.day)}</td><td>${r.orders}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
 
-    /* ── Recent Orders list — click a row (or the reprint icon) to
-       open an editable ReceiptDialog and re-print. ── */
+    /* ── Recent Orders list — click a row (or any icon) to view,
+       reprint, EDIT or DELETE the order. ── */
     const ordersEl = document.getElementById("rep-orders");
     if (ordersEl){
       const orders = DB.paidOrdersWithItems(s, e);
@@ -5459,6 +5763,9 @@ const ReportsPage = {
             <div class="oact">
               <button class="btn icon" data-act="receipt" title="${escapeHtml(t("view_receipt"))}">🧾</button>
               <button class="btn icon" data-act="reprint" title="${escapeHtml(t("reprint"))}">🖨</button>
+              <button class="btn icon" data-act="edit" title="${escapeHtml(t("order_edit"))}">✏️</button>
+              <button class="btn icon" data-act="del" style="color:var(--danger);"
+                      title="${escapeHtml(t("delete_order"))}">🗑</button>
             </div>
           </div>`;
         }).join("");
@@ -5479,6 +5786,10 @@ const ReportsPage = {
                 if (!snap){ toast("Order not found", "error"); return; }
                 const res = await Printer.print(snap, DB.settings);
                 if (res && res.ok) toast(t("print_job_sent"), "success");
+              } else if (act === "edit"){
+                ReportsPage._editOrder(id);
+              } else if (act === "del"){
+                ReportsPage._deleteOrder(id);
               }
             });
           });
@@ -5502,6 +5813,34 @@ const ReportsPage = {
     const snap = DB.buildReceiptSnapshot(orderId);
     if (!snap){ toast("Order not found", "error"); return; }
     ReceiptDialog.show(snap);
+  },
+
+  /* Open the full order editor (customer, payment, line items, totals). */
+  _editOrder(orderId){
+    OrderEditor.open(orderId, ()=>{
+      this.render();
+      try{
+        POSPage.renderProducts();
+        POSPage.renderTabs();
+        POSPage.updateCartFab();
+      }catch(e){}
+    });
+  },
+
+  /* Permanently delete the order and return its items to stock. */
+  _deleteOrder(orderId){
+    const o = DB.orders.find(x=>x.id === orderId);
+    if (!o){ toast("Order not found", "error"); return; }
+    if (!confirm(t("delete_order_q"))) return;
+    const ok = DB.deletePaidOrder(orderId, { restock:true });
+    if (!ok){ toast("Order not found", "error"); return; }
+    toast(t("order_deleted"), "success");
+    this.render();
+    try{
+      POSPage.renderProducts();
+      POSPage.renderTabs();
+      POSPage.updateCartFab();
+    }catch(e){}
   },
 };
 
