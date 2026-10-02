@@ -700,8 +700,8 @@ const I18N = {
     reset_day_counter_q: "Reset the order number counter for today?\n\nNew orders will start again at #0001.",
     day_counter_reset: "Day counter reset ✓",
     reset_counter_after_cc: "Also reset the day counter after printing Close Cash",
-        close_cash_hint: "Printing Close Cash closes the day: the report is printed and a new day starts — the next order will be #0001.",
-    day_closed: "Day closed — new day started, next order will be #0001",
+        close_cash_hint: "Printing Close Cash closes the day: the report is printed, the day counter and the daily totals are reset, and a new business day starts — the next order will be #0001.",
+    day_closed: "Day closed — counters reset to zero, next order will be #0001",
     delivery_fees: "Delivery fees",
     settings: "Settings",
     install_pwa: "📲  Install as an App (PWA)",
@@ -981,8 +981,8 @@ const I18N = {
     reset_day_counter_q: "هل تريد تصفير عدّاد أرقام الطلبات لليوم؟\n\nستبدأ الطلبات الجديدة من #0001.",
     day_counter_reset: "تم تصفير عدّاد اليوم ✓",
     reset_counter_after_cc: "أيضاً صفّر عدّاد اليوم بعد طباعة إغلاق الصندوق",
-	close_cash_hint: "طباعة إغلاق الصندوق تُغلق اليوم: يُطبع التقرير ويبدأ يوم جديد — الطلب التالي سيكون #0001.",
-    day_closed: "تم إغلاق اليوم — بدأ يوم جديد، الطلب التالي سيكون #0001",
+	close_cash_hint: "طباعة إغلاق الصندوق تُغلق اليوم: يُطبع التقرير، ويُصفَّر عدّاد اليوم وإجماليات اليوم، ويبدأ يوم عمل جديد — الطلب التالي سيكون #0001.",
+    day_closed: "تم إغلاق اليوم — تم تصفير العدّادات، الطلب التالي سيكون #0001",
     delivery_fees: "رسوم التوصيل",
 
     settings: "الإعدادات",
@@ -1287,7 +1287,7 @@ const DEFAULT_SETTINGS = {
 
   options_v2:"1", bbq_v1:"1", extras_v1:"1", extras_v2:"1", order_v1:"1",
   listener_v1:"1", lang_v1:"1", reset_v1:"1", delivery_v1:"1",
-  wings_flavor_v1:"1",
+  wings_flavor_v1:"1", wings_flavor_v2:"1",
   day_start_iso:"",
 };
 
@@ -1310,7 +1310,7 @@ const SEED_PRODUCTS = [
   ["Soft Drink","🥤","Drinks",0,55000,120,1,1],
 ];
 
-/* CHICKEN WINGS now has a Flavor group (Barbecue / Buffalo) */
+/* CHICKEN WINGS has a Flavor group — choose ONE (Barbecue OR Buffalo). */
 const CUSTOM_OPTIONS = {
   "Cheese Garlic Fingers":[
     { name:"Size", multi:false, choices:[
@@ -1331,7 +1331,7 @@ const CUSTOM_OPTIONS = {
       { label:"12 pcs + Fries", price: 800000 },
       { label:"24 pcs",         price:1100000 },
     ]},
-    { name:"Flavor", multi:true, max_choices:2, choices:[
+    { name:"Flavor", multi:false, max_choices:1, choices:[
       { label:"Barbecue", price:0 },
       { label:"Buffalo",  price:0 },
     ]},
@@ -1965,6 +1965,7 @@ const DB = {
     this.settings.reset_v1 = "1";
     this.settings.delivery_v1 = "1";
     this.settings.wings_flavor_v1 = "1";
+    this.settings.wings_flavor_v2 = "1";
     try{
       const opts = JSON.parse(this.settings.product_options);
       this.settings.product_options = JSON.stringify(ensureExtrasGroup(opts).groups);
@@ -2069,20 +2070,54 @@ const DB = {
         try{ groups = JSON.parse(wings.custom_options || "[]"); }catch(e){ groups = []; }
         if (!Array.isArray(groups) || !groups.length){
           groups = cloneJson(CUSTOM_OPTIONS["Chicken Wings"]);
-        } else if (!groups.some(g => g && g.name === "Flavor")){
-          groups.push({
-            name:"Flavor", multi:true, max_choices:2,
-            choices:[
+        } else {
+          let fg = groups.find(g => g && g.name === "Flavor");
+          if (!fg){
+            fg = { name:"Flavor", multi:false, max_choices:1, choices:[
               { label:"Barbecue", price:0 },
               { label:"Buffalo",  price:0 },
-            ],
-          });
+            ]};
+            groups.push(fg);
+          } else {
+            fg.multi = false;
+            fg.max_choices = 1;
+          }
         }
         wings.custom_options = JSON.stringify(groups);
         wings.has_options = 1;
         Persist.put("products", wings);
       }
       this.settings.wings_flavor_v1 = "1";
+      changed = true;
+    }
+
+    /* ─── v2: Chicken Wings flavor is a SINGLE choice (not both) ─── */
+    if (this.settings.wings_flavor_v2 !== "1"){
+      const wings = this.products.find(x => x.name === "Chicken Wings");
+      if (wings){
+        let groups = [];
+        try{ groups = JSON.parse(wings.custom_options || "[]"); }catch(e){ groups = []; }
+        if (!Array.isArray(groups) || !groups.length){
+          groups = cloneJson(CUSTOM_OPTIONS["Chicken Wings"]);
+        }
+        let fg = groups.find(g => g && g.name === "Flavor");
+        if (!fg){
+          fg = { name:"Flavor", choices:[] };
+          groups.push(fg);
+        }
+        fg.multi = false;
+        fg.max_choices = 1;
+        if (!Array.isArray(fg.choices) || !fg.choices.length){
+          fg.choices = [
+            { label:"Barbecue", price:0 },
+            { label:"Buffalo",  price:0 },
+          ];
+        }
+        wings.custom_options = JSON.stringify(groups);
+        wings.has_options = 1;
+        Persist.put("products", wings);
+      }
+      this.settings.wings_flavor_v2 = "1";
       changed = true;
     }
 
@@ -2201,7 +2236,7 @@ const DB = {
     Persist.remove("customers", id);
   },
 
-  /* ── ORDER NUMBER COUNTER — respects day_start_iso (reset point) ── */
+  /* ── ORDER NUMBER COUNTER — respects day_start_iso (business-day reset) ── */
   nextOrderNo(){
     const d = new Date();
     const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
@@ -2215,6 +2250,8 @@ const DB = {
     }
     return pref + String(n+1).padStart(4,"0");
   },
+  /* Called by "Print Close Cash": closes the business day — the order
+     counter restarts at #0001 and the daily totals start again from zero. */
   resetDayCounter(){
     this.settings.day_start_iso = nowIso();
     this.save("settings");
@@ -2403,11 +2440,24 @@ const DB = {
     Persist.remove("expenses", id);
   },
 
+  /* ───────────────────────────────────────────────────────────────
+     BUSINESS-DAY AWARE RANGE.
+     Orders created before the last "Print Close Cash" (day_start_iso)
+     belong to the previous business day, so they are excluded from the
+     range that starts on that same day — this is what makes the daily
+     totals start again from zero after closing the day.
+     ─────────────────────────────────────────────────────────────── */
   _paidOrdersInRange(s, e){
-    return this.orders.filter(o =>
-      o.status === "paid" &&
-      (o.created_at||"").slice(0,10) >= s &&
-      (o.created_at||"").slice(0,10) <= e);
+    const dayStart = String(this.settings.day_start_iso || "");
+    const dayDate  = dayStart ? dayStart.slice(0,10) : "";
+    const cutApplies = !!(dayStart && dayDate && dayDate >= s && dayDate <= e);
+    return this.orders.filter(o => {
+      if (o.status !== "paid") return false;
+      const d = (o.created_at||"").slice(0,10);
+      if (d < s || d > e) return false;
+      if (cutApplies && (o.created_at||"") < dayStart) return false;
+      return true;
+    });
   },
   paidOrdersWithItems(s, e){
     return this._paidOrdersInRange(s, e)
@@ -2954,7 +3004,10 @@ function buildEscPosReceipt(order, settings, copyLabel){
 }
 
 /* ───────────────────────────────────────────────────────────────
-   CLOSE-CASH report — now with SALES BY CATEGORY.
+   CLOSE-CASH report — closes the business day.
+   The report itself shows the day that is being closed; printing it
+   resets the day counter and the daily totals for the next business
+   day (handled by the caller / ReportsPage).
    ─────────────────────────────────────────────────────────────── */
 function buildCloseCashText(start, end, settings){
   const sym = settings.currency_symbol || "LBP ";
@@ -3107,9 +3160,10 @@ function buildCloseCashText(start, end, settings){
   if (rate) lines.push(center(secSym + (cash.expected/rate).toFixed(2) + "  @ " + rate.toFixed(0)));
   lines.push(sep("="));
 
-  /* ── Day closed marker ── */
+  /* ── Day closed marker — counters reset for the next business day ── */
   lines.push("");
   lines.push(center("*** DAY CLOSED ***"));
+  lines.push(center("Daily counters reset to ZERO"));
   lines.push(center("Next order: #0001"));
   lines.push("");
   lines.push(lr("Opened by", "________________"));
@@ -4271,12 +4325,22 @@ const POSPage = {
         const isLarge   = state.size === "Large";
         const show = isExtras || !largeOnly || isLarge;
         let hint;
-        if (isExtras) hint = ` <span class="faint">(optional · tap to toggle)</span>`;
-        else if (isFlavor && largeOnly) hint = ` <span class="faint">(optional · choose 1 or 2)</span>`;
-        else if (isFlavor) hint = ` <span class="faint">(optional · choose 1 or 2)</span>`;
-        else if (grp.multi && grp.max_choices) hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
-        else if (grp.multi) hint = " <span class='faint'>(multiple)</span>";
-        else hint = "";
+        if (isExtras){
+          hint = ` <span class="faint">(optional · tap to toggle)</span>`;
+        } else if (isFlavor){
+          /* Single-select flavors (e.g. Chicken Wings) show "choose 1",
+             multi-select flavors (pizza) show the max allowed. */
+          const maxF = grp.multi ? (Number(grp.max_choices) || 2) : 1;
+          hint = maxF <= 1
+            ? ` <span class="faint">(optional · choose 1 only)</span>`
+            : ` <span class="faint">(optional · choose 1 or ${maxF})</span>`;
+        } else if (grp.multi && grp.max_choices){
+          hint = ` <span class="faint">(up to ${grp.max_choices})</span>`;
+        } else if (grp.multi){
+          hint = " <span class='faint'>(multiple)</span>";
+        } else {
+          hint = "";
+        }
         html += `<div class="opt-group" style="display:${show?"block":"none"};">`
           + `<h3>${escapeHtml(grp.name)}${hint}</h3>`
           + `<div class="opt-chips">`;
@@ -4332,12 +4396,19 @@ const POSPage = {
             state.size = (state.size === l) ? null : l;
             if (state.size !== "Large") state.flavorSet.clear();
           } else if (g === "Flavor"){
-            if (state.flavorSet.has(l)) state.flavorSet.delete(l);
-            else {
-              const grp = groups.find(x => x.name === "Flavor");
-              const maxC = (grp && Number(grp.max_choices)) || 2;
-              if (state.flavorSet.size >= maxC) state.flavorSet.delete(state.flavorSet.values().next().value);
-              state.flavorSet.add(l);
+            const grp = groups.find(x => x.name === "Flavor");
+            const isMulti = !!(grp && grp.multi);
+            if (!isMulti){
+              /* Single choice — pick ONE flavor only (e.g. Chicken Wings). */
+              if (state.flavorSet.has(l) && state.flavorSet.size === 1) state.flavorSet.clear();
+              else { state.flavorSet.clear(); state.flavorSet.add(l); }
+            } else {
+              if (state.flavorSet.has(l)) state.flavorSet.delete(l);
+              else {
+                const maxC = (grp && Number(grp.max_choices)) || 2;
+                if (state.flavorSet.size >= maxC) state.flavorSet.delete(state.flavorSet.values().next().value);
+                state.flavorSet.add(l);
+              }
             }
           } else {
             const grp = groups.find(x=>x.name === g);
@@ -5795,14 +5866,40 @@ const ReportsPage = {
       });
     });
 
-    /* Print Close Cash — optionally reset the day counter afterwards. */
+    /* ───────────────────────────────────────────────────────────
+       PRINT CLOSE CASH  →  CLOSE THE DAY.
+       The report is printed first (it shows everything that happened
+       during the day being closed), then the business day is closed:
+       the daily order counter restarts at #0001 and every daily total
+       (orders, revenue, cash, drawer) starts again from ZERO for the
+       next business day.
+       ─────────────────────────────────────────────────────────── */
     document.getElementById("rep-print-cc").addEventListener("click", async ()=>{
-      const text = buildCloseCashText(this.from, this.to, DB.settings);
-      const res = await Printer.printText(text, DB.settings);
-      const chk = document.getElementById("rep-cc-reset");
-      if (chk && chk.checked && (!res || res.ok !== false)){
+      const btn = document.getElementById("rep-print-cc");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try{
+        const text = buildCloseCashText(this.from, this.to, DB.settings);
+        const res  = await Printer.printText(text, DB.settings);
+        if (!res || res.ok === false){
+          toast(t("printing_fail"), "error", 5000);
+          return;
+        }
+        /* Close the business day — counters & totals reset to zero. */
         DB.resetDayCounter();
-        toast(t("day_counter_reset"), "success");
+        this.from = todayStr();
+        this.to   = todayStr();
+        this._activeQuick = "0";
+        const f  = document.getElementById("rep-from");
+        const tt = document.getElementById("rep-to");
+        if (f)  f.value  = this.from;
+        if (tt) tt.value = this.to;
+        this._paintQuick();
+        this.render();
+        try{ POSPage.renderTabs(); POSPage.updateCartFab(); }catch(e){}
+        toast(t("day_closed"), "success", 6500);
+      } finally {
+        btn.disabled = false;
       }
     });
     document.getElementById("rep-sync-cc").addEventListener("click", async ()=>{
@@ -5810,11 +5907,6 @@ const ReportsPage = {
       const res = await CloudSync.pushCloseCash(this.from, this.to);
       if (res.ok) toast(t("close_cash_synced"), "success");
       else toast(t("firebase_sync_failed") + res.info, "error", 5000);
-    });
-    document.getElementById("rep-reset-counter").addEventListener("click", ()=>{
-      if (!confirm(t("reset_day_counter_q"))) return;
-      DB.resetDayCounter();
-      toast(t("day_counter_reset"), "success");
     });
     document.getElementById("rep-reset").addEventListener("click", ()=>{
       ResetReports.open(()=>{
