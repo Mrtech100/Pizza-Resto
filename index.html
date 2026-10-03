@@ -482,8 +482,14 @@ html[dir="rtl"] .opt-builder .row{flex-direction:row-reverse;}
   body > *:not(#receipt-area){display:none !important;}
   #receipt-area{display:block !important; position:absolute; top:0; left:0;
     width:100%; background:#fff; color:#000;}
-  .receipt-copy{font-family:'Courier New', ui-monospace, monospace;
-    font-size:12px; line-height:1.35; white-space:pre; padding:6mm 4mm; color:#000;}
+  /* ── Clean, readable monospace receipt font (fallback path) ── */
+  .receipt-copy{
+    font-family:'Cascadia Mono','SF Mono','Consolas','Menlo','DejaVu Sans Mono',
+                'Roboto Mono','Courier New',ui-monospace,monospace;
+    font-size:12px; line-height:1.5; font-weight:700;
+    letter-spacing:0.02em;
+    white-space:pre; padding:6mm 4mm; color:#000; background:#fff;
+  }
   .receipt-copy + .receipt-copy{page-break-before:always;}
   @page{size:80mm auto; margin:0;}
 }
@@ -569,7 +575,6 @@ const I18N = {
     tagline: "Restaurant Management Suite",
     username: "Username", password: "Password",
     sign_in: "Sign In",
-    default_hint: "Default: admin / admin123",
     connecting_cloud: "☁ Connecting to shared database…",
     shared_ok: "☁ Shared database connected — data syncs across all devices.",
     shared_fail: "⚠ Shared database unavailable — running on this device's local copy.",
@@ -850,7 +855,6 @@ const I18N = {
     tagline: "نظام إدارة المطاعم",
     username: "اسم المستخدم", password: "كلمة المرور",
     sign_in: "تسجيل الدخول",
-    default_hint: "الافتراضي: admin / admin123",
     connecting_cloud: "☁ جارٍ الاتصال بقاعدة البيانات المشتركة…",
     shared_ok: "☁ تم الاتصال بقاعدة البيانات المشتركة — تتم المزامنة بين جميع الأجهزة.",
     shared_fail: "⚠ قاعدة البيانات المشتركة غير متاحة — يعمل التطبيق على النسخة المحلية.",
@@ -1409,6 +1413,31 @@ function withTimeout(promise, ms){
   });
 }
 function sleep(ms){ return new Promise(r => setTimeout(r, Math.max(0, ms|0))); }
+
+/* ── Wrap text into lines that fit a monospace receipt width ── */
+function wrapText(text, width){
+  width = Math.max(4, width|0);
+  const words = String(text == null ? "" : text).split(/\s+/).filter(Boolean);
+  const out = [];
+  let cur = "";
+  for (const w of words){
+    if (!cur){ cur = w; continue; }
+    if ((cur + " " + w).length <= width) cur += " " + w;
+    else { out.push(cur); cur = w; }
+  }
+  if (cur) out.push(cur);
+  return out.length ? out : [""];
+}
+/* Wraps "prefix + text" and indents continuation lines by prefix.length spaces. */
+function wrapWithPrefix(prefix, text, width){
+  const indent = " ".repeat(prefix.length);
+  const lines = wrapText(text, Math.max(4, width - prefix.length));
+  const out = [];
+  for (let i = 0; i < lines.length; i++){
+    out.push((i === 0 ? prefix : indent) + lines[i]);
+  }
+  return out;
+}
 
 function concatBytes(){
   let len = 0;
@@ -2290,6 +2319,7 @@ const DB = {
           order_type:o.type, status,
           customer_id:o.customer_id, customer_name:o.customer_name||"",
           customer_phone:o.customer_phone||"",
+          customer_address:o.customer_address||"",
           subtotal:o.subtotal, discount:o.discount, tax:o.tax,
           delivery:o.delivery, total:o.total,
           payment_method:o.payment_method||"Cash",
@@ -2308,6 +2338,7 @@ const DB = {
         id:oid, order_no:no, order_type:o.type||"Delivery", status,
         customer_id:o.customer_id||null, customer_name:o.customer_name||"",
         customer_phone:o.customer_phone||"",
+        customer_address:o.customer_address||"",
         subtotal:o.subtotal, discount:o.discount, tax:o.tax,
         delivery:o.delivery, total:o.total,
         payment_method:o.payment_method||"Cash",
@@ -2458,6 +2489,31 @@ const DB = {
       return true;
     });
   },
+
+  /* ───────────────────────────────────────────────────────────────
+     EXPENSES — business-day aware.
+     An expense affects the day it was entered (its `spent_on`). After
+     "Print Close Cash" for that same day, the expense is excluded from
+     the *current* close-cash view (so daily totals reset to zero), but
+     the record stays in the DB and still appears in wider ranges and
+     in the general reports.
+     ─────────────────────────────────────────────────────────────── */
+  _expensesInRange(s, e){
+    const dayStart = String(this.settings.day_start_iso || "");
+    const dayDate  = dayStart ? dayStart.slice(0,10) : "";
+    const cutApplies = !!(dayStart && dayDate && dayDate >= s && dayDate <= e);
+    return this.expenses.filter(x => {
+      const d = x.spent_on || "";
+      if (d < s || d > e) return false;
+      // Only reset expenses that belong to the *current business day*
+      // and were entered before the day was closed.
+      if (cutApplies && d === dayDate && x.created_at && x.created_at < dayStart){
+        return false;
+      }
+      return true;
+    });
+  },
+
   paidOrdersWithItems(s, e){
     return this._paidOrdersInRange(s, e)
       .map(o => Object.assign({}, o, {
@@ -2473,6 +2529,7 @@ const DB = {
       id: row.id, no: row.order_no, type: row.order_type || "Delivery",
       customer_id: row.customer_id, customer_name: row.customer_name || "",
       customer_phone: row.customer_phone || "",
+      customer_address: row.customer_address || "",
       items: items.map(i => ({
         name: i.name, qty: i.qty, unit: i.unit_price, line: i.line_total,
         options: String(i.options||"").split(",")
@@ -2486,8 +2543,7 @@ const DB = {
   },
   summary(s, e){
     const os = this._paidOrdersInRange(s, e);
-    const exp = this.expenses.filter(x =>
-      (x.spent_on||"") >= s && (x.spent_on||"") <= e);
+    const exp = this._expensesInRange(s, e);
     return {
       orders:   os.length,
       revenue:  os.reduce((a,o)=>a + Number(o.total||0), 0),
@@ -2548,8 +2604,7 @@ const DB = {
   },
   cashSummary(s, e){
     const os = this._paidOrdersInRange(s, e).filter(o=>o.payment_method === "Cash");
-    const exp = this.expenses.filter(x =>
-      (x.spent_on||"") >= s && (x.spent_on||"") <= e);
+    const exp = this._expensesInRange(s, e);
     const cash_sales = os.reduce((a,o)=>a + Number(o.total||0), 0);
     const expenses   = exp.reduce((a,x)=>a + Number(x.amount||0), 0);
     return { cash_orders: os.length, cash_sales, expenses, expected: cash_sales - expenses };
@@ -2896,6 +2951,12 @@ function buildReceiptText(order, settings, copyLabel=""){
   lines.push(lr("Order: " + order.no, when));
   if (order.customer_name) lines.push("Customer: " + order.customer_name);
   if (order.customer_phone) lines.push("Phone: " + order.customer_phone);
+  /* Customer address — wrap onto multiple lines when long. */
+  if (order.customer_address){
+    for (const l of wrapWithPrefix("Address: ", order.customer_address, RECEIPT_WIDTH)){
+      lines.push(l);
+    }
+  }
   lines.push("Type: " + (order.type || "Delivery"));
   lines.push(sep("-"));
   for (const it of order.items){
@@ -2951,6 +3012,11 @@ function buildEscPosBody(order, settings, copyLabel){
   p.line(lr("Order: " + order.no, when));
   if (order.customer_name) p.line("Customer: " + order.customer_name);
   if (order.customer_phone) p.line("Phone: " + order.customer_phone);
+  if (order.customer_address){
+    for (const l of wrapWithPrefix("Address: ", order.customer_address, RECEIPT_WIDTH)){
+      p.line(l);
+    }
+  }
   p.line("Type: " + (order.type || "Delivery"));
   p.line(sep("-"));
   for (const it of order.items){
@@ -3055,6 +3121,12 @@ function buildCloseCashText(start, end, settings){
           (o.customer_phone ? "  " + o.customer_phone : "");
         lines.push(cLine.slice(0, RECEIPT_WIDTH));
       }
+      /* Customer address — wrapped and indented under "Address:" */
+      if (o.customer_address){
+        for (const l of wrapWithPrefix("  Address: ", o.customer_address, RECEIPT_WIDTH)){
+          lines.push(l);
+        }
+      }
       lines.push("  Items:");
       for (const it of (o.items || [])){
         grandItems += Number(it.qty||0);
@@ -3121,9 +3193,8 @@ function buildCloseCashText(start, end, settings){
     lines.push(sep("="));
   }
 
-  /* ── EXPENSES — full detail ── */
-  const expenses = DB.expenses
-    .filter(x => (x.spent_on||"") >= start && (x.spent_on||"") <= end)
+  /* ── EXPENSES — full detail (business-day aware) ── */
+  const expenses = DB._expensesInRange(start, end)
     .sort((a,b) => String(a.spent_on||"").localeCompare(String(b.spent_on||"")));
 
   lines.push("");
@@ -3322,24 +3393,34 @@ const Printer = {
     await this.printTextViaIframe(blocks);
     return { ok:true };
   },
+
+  /* ───────────────────────────────────────────────────────────
+     Browser print — the visible receipt is written into a hidden
+     iframe. The font stack below is deliberately simple: a wide
+     monospace family with a heavier weight, so the paper copy is
+     crisp and easy to read instead of the previous stroked/shadowed
+     look that appeared smudged.
+     ─────────────────────────────────────────────────────────── */
   async printTextViaIframe(blocks){
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       html,body{margin:0;padding:0;background:#fff;color:#000;}
       .receipt-copy{
-        font-family:'Consolas','Menlo','DejaVu Sans Mono','Courier New',ui-monospace,monospace;
-        font-size:12px; font-weight:700;
-        -webkit-text-stroke:0.35px #000;
-        text-shadow:0 0 0.6px #000, 0 0 0.4px #000;
-        line-height:1.35; letter-spacing:0.1px;
+        font-family:'Cascadia Mono','SF Mono','Consolas','Menlo',
+                    'DejaVu Sans Mono','Roboto Mono','Courier New',
+                    ui-monospace,monospace;
+        font-size:12px;
+        font-weight:700;
+        line-height:1.5;
+        letter-spacing:0.02em;
         white-space:pre;
+        color:#000;
+        background:#fff;
         padding:6mm 4mm 18mm 4mm;
         page-break-after:always; break-after:page;
-        -webkit-font-smoothing:none;
       }
       .receipt-copy:last-child{ page-break-after:auto; break-after:auto; }
       @media print{
         @page{ size:80mm auto; margin:0; }
-        .receipt-copy{ -webkit-text-stroke:0.35px #000; text-shadow:0 0 0.6px #000; }
       }
     </style></head><body>${
       blocks.map(b => `<div class="receipt-copy">${escapeHtml(b)}</div>`).join("")
@@ -4092,6 +4173,7 @@ const POSPage = {
       id:o.id, no:o.order_no, type:o.order_type || "Delivery",
       customer_id:o.customer_id, customer_name:o.customer_name || "",
       customer_phone:o.customer_phone || "",
+      customer_address:o.customer_address || "",
       items: o.items.map(i=>({
         name:i.name, qty:i.qty, unit:i.unit_price, line:i.line_total,
         options: String(i.options||"").split(",").filter(x=>x.trim()).map(x=>({label:x.trim()})),
@@ -4119,7 +4201,8 @@ const POSPage = {
     let html = `<div class="item" data-id=""><b>— Walk-in / No customer —</b></div>`;
     html += rows.map(c =>
       `<div class="item" data-id="${c.id}">${escapeHtml(c.name)}${
-        c.phone ? ` <span class="ph">• ${escapeHtml(c.phone)}</span>` : ""}</div>`
+        c.phone ? ` <span class="ph">• ${escapeHtml(c.phone)}</span>` : ""}${
+        c.address ? ` <span class="ph">• ${escapeHtml(c.address)}</span>` : ""}</div>`
     ).join("");
     list.innerHTML = html;
     list.querySelectorAll(".item").forEach(el=>{
@@ -4137,9 +4220,11 @@ const POSPage = {
   },
   resolveCustomer(){
     const text = document.getElementById("cust-input").value.trim();
-    if (!text) return { id:null, name:"", phone:"" };
+    if (!text) return { id:null, name:"", phone:"", address:"" };
     const c = DB.customers.find(x=>String(x.name||"").toLowerCase() === text.toLowerCase());
-    return c ? { id:c.id, name:c.name, phone:c.phone||"" } : { id:null, name:text, phone:"" };
+    return c
+      ? { id:c.id, name:c.name, phone:c.phone||"", address:c.address||"" }
+      : { id:null, name:text, phone:"", address:"" };
   },
   setCustomer(id, name){ document.getElementById("cust-input").value = name || ""; },
   initDeliveryPicker(){
@@ -4327,8 +4412,6 @@ const POSPage = {
         if (isExtras){
           hint = ` <span class="faint">(optional · tap to toggle)</span>`;
         } else if (isFlavor){
-          /* Single-select flavors (e.g. Chicken Wings) show "choose 1",
-             multi-select flavors (pizza) show the max allowed. */
           const maxF = grp.multi ? (Number(grp.max_choices) || 2) : 1;
           hint = maxF <= 1
             ? ` <span class="faint">(optional · choose 1 only)</span>`
@@ -4398,7 +4481,6 @@ const POSPage = {
             const grp = groups.find(x => x.name === "Flavor");
             const isMulti = !!(grp && grp.multi);
             if (!isMulti){
-              /* Single choice — pick ONE flavor only (e.g. Chicken Wings). */
               if (state.flavorSet.has(l) && state.flavorSet.size === 1) state.flavorSet.clear();
               else { state.flavorSet.clear(); state.flavorSet.add(l); }
             } else {
@@ -4579,6 +4661,7 @@ const POSPage = {
       }),
       customer_id:o.customer_id, customer_name:o.customer_name || "",
       customer_phone:o.customer_phone || "",
+      customer_address:o.customer_address || "",
       discount:Number(o.discount)||0, delivery:Number(o.delivery)||0,
     };
     this.setCustomer(o.customer_id, o.customer_name || "");
@@ -4592,6 +4675,7 @@ const POSPage = {
     this.current_order = {
       id:null, no: DB.nextOrderNo(), type:"Delivery",
       items:[], customer_id:null, customer_name:"", customer_phone:"",
+      customer_address:"",
       discount:0, delivery:0, subtotal:0, tax:0, total:0,
     };
     this.setCustomer(null, "");
@@ -4612,10 +4696,11 @@ const POSPage = {
       toast(t("nothing_to_hold"), "warning"); return;
     }
     const wasEditing = !!this.current_order.id;
-    const { id, name, phone } = this.resolveCustomer();
+    const { id, name, phone, address } = this.resolveCustomer();
     this.current_order.customer_id = id;
     this.current_order.customer_name = name;
     this.current_order.customer_phone = phone;
+    this.current_order.customer_address = address;
     DB.saveOrder(this.current_order, "open");
     DB.saveAll();
     toast(`${this.current_order.no} ${wasEditing ? t("order_updated") : t("order_held")}`, "success");
@@ -4669,10 +4754,11 @@ const POSPage = {
     update();
   },
   async finalizePayment(){
-    const { id, name, phone } = this.resolveCustomer();
+    const { id, name, phone, address } = this.resolveCustomer();
     this.current_order.customer_id = id;
     this.current_order.customer_name = name;
     this.current_order.customer_phone = phone;
+    this.current_order.customer_address = address;
     this.current_order.payment_method = "Cash";
     this.current_order.user_id = App.user ? App.user.id : null;
     DB.saveOrder(this.current_order, "paid");
@@ -4682,6 +4768,7 @@ const POSPage = {
       id:this.current_order.id, no:this.current_order.no,
       type:this.current_order.type || "Delivery",
       customer_id:id, customer_name:name, customer_phone:phone,
+      customer_address:address,
       items:this.current_order.items.map(i=>({
         name:i.name, qty:i.qty, unit:i.unit, line:i.line,
         options:i.options||[], note:i.note||"",
@@ -4953,6 +5040,8 @@ const OrderEditor = {
           <div class="form-row"><label>${escapeHtml(t("phone"))}</label>
             <input id="oe-phone" value="${escapeHtml(o.customer_phone||"")}"></div>
         </div>
+        <div class="form-row"><label>${escapeHtml(t("address"))}</label>
+          <input id="oe-addr" value="${escapeHtml(o.customer_address||"")}"></div>
         <div class="form-row"><label>${escapeHtml(t("payment_method"))}</label>
           <select id="oe-pay">
             <option value="Cash" ${pay==="Cash"?"selected":""}>Cash</option>
@@ -5121,6 +5210,7 @@ const OrderEditor = {
     DB.updateOrder(this._id, {
       customer_name:  (document.getElementById("oe-name").value||"").trim(),
       customer_phone: (document.getElementById("oe-phone").value||"").trim(),
+      customer_address: (document.getElementById("oe-addr").value||"").trim(),
       payment_method: document.getElementById("oe-pay").value || "Cash",
       subtotal: c.subtotal,
       discount: c.discount,
@@ -5870,8 +5960,10 @@ const ReportsPage = {
        The report is printed first (it shows everything that happened
        during the day being closed), then the business day is closed:
        the daily order counter restarts at #0001 and every daily total
-       (orders, revenue, cash, drawer) starts again from ZERO for the
-       next business day.
+       (orders, revenue, cash, drawer and — since this build — expenses
+       entered for that day before close) starts again from ZERO for
+       the next business day. Expenses remain in the DB, so they still
+       appear in wider ranges (week/month) and general reports.
        ─────────────────────────────────────────────────────────── */
     document.getElementById("rep-print-cc").addEventListener("click", async ()=>{
       const btn = document.getElementById("rep-print-cc");
@@ -6699,6 +6791,7 @@ function sampleReceipt(){
   return {
     no:"TEST-0001", type:"Delivery",
     customer_name:"Test Customer", customer_phone:"+961 71 234 567",
+    customer_address:"123 Main Street, Apt 4B, Beirut, Lebanon",
     items:[
       {name:"Margherita Pizza", qty:1, unit:1100000, line:1100000,
         options:[{label:"Large"},{label:"Margherita"},{label:"Pepperoni"}],
@@ -6790,6 +6883,7 @@ const CloudSync = {
     const doc = {
       order_no: o.no, order_type: o.type, customer: o.customer_name||"",
       customer_id: o.customer_id||null, customer_phone: o.customer_phone||"",
+      customer_address: o.customer_address||"",
       subtotal: +o.subtotal||0, discount: +o.discount||0,
       delivery: +o.delivery||0, total: +o.total||0,
       currency: (DB.settings.currency_symbol||"LBP ").trim(),
