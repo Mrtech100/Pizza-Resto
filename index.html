@@ -848,6 +848,20 @@ const I18N = {
     role_remote: "Remote device",
     role_store_applied: "Store role applied — listener ON, browser printer",
     role_remote_applied: "Remote role applied — cloud printer, listener OFF",
+
+    /* ── NEW: report date navigation ── */
+    rep_mode_day: "📅 Day",
+    rep_mode_range: "↔ Range",
+    rep_yesterday: "Yesterday",
+    rep_last7: "Last 7 days",
+    rep_last30: "Last 30 days",
+    rep_this_month: "This month",
+    rep_last_month: "Last month",
+    rep_prev_day: "Previous day",
+    rep_next_day: "Next day",
+    rep_jump: "Jump to a day (days with orders are marked)",
+    rep_showing_day: "Showing: {date}",
+    rep_showing_range: "Showing: {from}  →  {to}   ({n} days)",
   },
 
   ar: {
@@ -1129,6 +1143,20 @@ const I18N = {
     role_remote: "جهاز بعيد",
     role_store_applied: "تم تطبيق دور المتجر — المستمع مفعّل، طابعة المتصفح",
     role_remote_applied: "تم تطبيق الدور البعيد — طابعة سحابية، المستمع متوقف",
+
+    /* ── جديد: التنقل بين تواريخ التقارير ── */
+    rep_mode_day: "📅 يوم",
+    rep_mode_range: "↔ نطاق",
+    rep_yesterday: "أمس",
+    rep_last7: "آخر 7 أيام",
+    rep_last30: "آخر 30 يوماً",
+    rep_this_month: "هذا الشهر",
+    rep_last_month: "الشهر الماضي",
+    rep_prev_day: "اليوم السابق",
+    rep_next_day: "اليوم التالي",
+    rep_jump: "الانتقال إلى يوم (الأيام التي فيها طلبات مُعلَّمة)",
+    rep_showing_day: "عرض: {date}",
+    rep_showing_range: "عرض: {from}  →  {to}   ({n} أيام)",
   }
 };
 
@@ -5865,28 +5893,161 @@ const ExpensesPage = {
   },
 };
 
-/* ═══════════════════ REPORTS PAGE ═══════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   REPORTS PAGE  —  REWRITTEN for easy date navigation.
+   • Day / Range switch
+   • ◀ ▶  one-tap previous / next day
+   • Rolling presets (Today, Yesterday, 7d, 30d, This month, Last month)
+   • "Jump to a day" strip: every day with orders + the last 14 days,
+     each chip shows the day, weekday and its revenue
+   • The chosen view is remembered between visits (localStorage)
+   All report maths / printing / close-cash behaviour is unchanged.
+   ═══════════════════════════════════════════════════════════════════════════ */
 const ReportsPage = {
-  from:null, to:null, initialized:false,
-  _activeQuick: "7",
+  from:null, to:null, mode:"range", initialized:false, _activeQuick:"7",
+  _prefsKey:"reports_view",
 
+  /* ─────────── saved view (come back exactly where you left) ─────────── */
+  _loadPrefs(){
+    const p = STORE.get(this._prefsKey, null);
+    if (!p || typeof p !== "object") return false;
+    const okDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v||""));
+    if (!okDate(p.from) || !okDate(p.to)) return false;
+    this.mode = (p.mode === "day") ? "day" : "range";
+    this.from = p.from;
+    this.to   = p.to;
+    this._activeQuick = p.quick || null;
+    if (this.from > this.to){ const tmp = this.from; this.from = this.to; this.to = tmp; }
+    return true;
+  },
+  _savePrefs(){
+    try{
+      STORE.set(this._prefsKey, {
+        mode:this.mode, from:this.from, to:this.to,
+        quick:this._activeQuick || null,
+      });
+    }catch(e){}
+  },
+
+  /* ─────────── quick ranges ─────────── */
+  _applyQuick(q){
+    const today = todayStr();
+    if (q === "0"){ this.mode = "day";   this.from = this.to = today; }
+    else if (q === "1"){ this.mode = "day"; this.from = this.to = addDaysStr(today,-1); }
+    else if (q === "7"){ this.mode = "range"; this.from = addDaysStr(today,-7);  this.to = today; }
+    else if (q === "30"){ this.mode = "range"; this.from = addDaysStr(today,-30); this.to = today; }
+    else if (q === "tm"){ this.mode = "range"; this.from = firstOfMonthStr(today); this.to = today; }
+    else if (q === "lm"){
+      const lastEnd = addDaysStr(firstOfMonthStr(today), -1);
+      this.mode = "range"; this.from = firstOfMonthStr(lastEnd); this.to = lastEnd;
+    }
+    this._activeQuick = q;
+    this._refresh();
+  },
+
+  /* ─────────── one day back / forward ─────────── */
+  _shiftDay(delta){
+    const base = (this.mode === "day") ? this.from : this.to;
+    const next = addDaysStr(base, delta);
+    if (delta > 0 && next > todayStr()) return;      /* never past today */
+    this.from = this.to = next;
+    this.mode = "day";
+    this._activeQuick = null;
+    this._refresh();
+  },
+
+  /* ─────────── days offered in the jump strip ─────────── */
+  _recentDays(limit){
+    limit = limit || 45;
+    const set = new Set();
+    const today = todayStr();
+    for (let i = 0; i < 14; i++) set.add(addDaysStr(today, -i));
+    for (const o of DB.orders){
+      if (o.status !== "paid") continue;
+      const d = String(o.created_at||"").slice(0,10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) set.add(d);
+    }
+    return [...set].sort((a,b)=> b.localeCompare(a)).slice(0, limit);
+  },
+  _dayRevenueMap(){
+    const m = new Map();
+    for (const o of DB.orders){
+      if (o.status !== "paid") continue;
+      const d = String(o.created_at||"").slice(0,10);
+      if (!d) continue;
+      m.set(d, (m.get(d)||0) + Number(o.total||0));
+    }
+    return m;
+  },
+
+  _refresh(){ this._savePrefs(); this.render(); },
+
+  /* ═══════════════ INIT ═══════════════ */
   init(){
     if (this.initialized) return;
     this.initialized = true;
-    this.from = addDaysStr(todayStr(), -7);
-    this.to   = todayStr();
-    this._activeQuick = "7";
+
+    /* restore / resolve the visible date range */
+    if (!this._loadPrefs()){
+      this.mode = "range";
+      this.from = addDaysStr(todayStr(), -7);
+      this.to   = todayStr();
+      this._activeQuick = "7";
+    } else {
+      /* rolling presets follow the calendar */
+      const q = this._activeQuick, today = todayStr();
+      if (q === "0"){ this.mode = "day";   this.from = this.to = today; }
+      else if (q === "1"){ this.mode = "day"; this.from = this.to = addDaysStr(today,-1); }
+      else if (q === "7"){ this.mode = "range"; this.from = addDaysStr(today,-7);  this.to = today; }
+      else if (q === "30"){ this.mode = "range"; this.from = addDaysStr(today,-30); this.to = today; }
+      else if (q === "tm"){ this.mode = "range"; this.from = firstOfMonthStr(today); this.to = today; }
+    }
+
     const el = document.getElementById("page-reports");
     el.innerHTML = `
       <div class="page-head"><h1>${escapeHtml(t("reports"))}</h1></div>
-      <div class="report-controls">
-        <label class="muted">${escapeHtml(t("from"))}</label><input type="date" id="rep-from">
-        <label class="muted">${escapeHtml(t("to"))}</label><input type="date" id="rep-to">
-        <button class="btn primary" id="rep-apply">${escapeHtml(t("apply"))}</button>
-        <button class="btn chip" data-q="0">${escapeHtml(t("today"))}</button>
-        <button class="btn chip" data-q="7">${escapeHtml(t("week"))}</button>
-        <button class="btn chip" data-q="30">${escapeHtml(t("month"))}</button>
+
+      <div class="card" style="padding:12px; margin-bottom:12px;">
+
+        <div class="report-controls" style="margin-bottom:10px;">
+          <div class="seg" id="rep-mode-seg">
+            <button data-mode="day">${escapeHtml(t("rep_mode_day"))}</button>
+            <button data-mode="range">${escapeHtml(t("rep_mode_range"))}</button>
+          </div>
+          <div style="flex:1;"></div>
+          <button class="btn chip" data-q="0">${escapeHtml(t("today"))}</button>
+          <button class="btn chip" data-q="1">${escapeHtml(t("rep_yesterday"))}</button>
+          <button class="btn chip" data-q="7">${escapeHtml(t("rep_last7"))}</button>
+          <button class="btn chip" data-q="30">${escapeHtml(t("rep_last30"))}</button>
+          <button class="btn chip" data-q="tm">${escapeHtml(t("rep_this_month"))}</button>
+          <button class="btn chip" data-q="lm">${escapeHtml(t("rep_last_month"))}</button>
+        </div>
+
+        <!-- DAY mode -->
+        <div id="rep-day-row" class="report-controls" style="margin-bottom:0;">
+          <button class="btn icon" id="rep-prev" title="${escapeHtml(t("rep_prev_day"))}">◀</button>
+          <input type="date" id="rep-day" style="max-width:190px;">
+          <button class="btn icon" id="rep-next" title="${escapeHtml(t("rep_next_day"))}">▶</button>
+          <span class="muted" id="rep-day-lbl" style="font-weight:700;"></span>
+        </div>
+
+        <!-- RANGE mode -->
+        <div id="rep-range-row" class="report-controls" style="margin-bottom:0;">
+          <label class="muted">${escapeHtml(t("from"))}</label>
+          <input type="date" id="rep-from" style="max-width:170px;">
+          <label class="muted">${escapeHtml(t("to"))}</label>
+          <input type="date" id="rep-to" style="max-width:170px;">
+          <button class="btn primary" id="rep-apply">${escapeHtml(t("apply"))}</button>
+        </div>
+
+        <hr class="sep">
+
+        <div class="faint" style="font-size:11px; margin-bottom:6px;">${escapeHtml(t("rep_jump"))}</div>
+        <div class="cat-bar" id="rep-days-strip"></div>
+
+        <div class="muted" id="rep-range-label" style="margin-top:10px; font-weight:700; font-size:12px;"></div>
       </div>
+
       <div class="cards-row" id="rep-cards"></div>
       <div class="report-grid">
         <div class="card report-box"><h3>${escapeHtml(t("top_products"))}</h3>
@@ -5931,28 +6092,57 @@ const ReportsPage = {
         </div>
       </div>`;
 
-    document.getElementById("rep-from").value = this.from;
-    document.getElementById("rep-to").value   = this.to;
-    document.getElementById("rep-from").addEventListener("change", e=>{
-      this.from = e.target.value; this._activeQuick = null; this._paintQuick(); this.render();
-    });
-    document.getElementById("rep-to").addEventListener("change", e=>{
-      this.to = e.target.value; this._activeQuick = null; this._paintQuick(); this.render();
-    });
-    document.getElementById("rep-apply").addEventListener("click", ()=>{
-      this._activeQuick = null; this._paintQuick(); this.render();
-    });
-    el.querySelectorAll("[data-q]").forEach(b=>{
+    const $ = id => document.getElementById(id);
+
+    /* ── Day / Range mode ── */
+    $("rep-mode-seg").querySelectorAll("button").forEach(b=>{
       b.addEventListener("click", ()=>{
-        const q = Number(b.dataset.q);
-        this.from = addDaysStr(todayStr(), -q);
-        this.to = todayStr();
-        this._activeQuick = String(q);
-        document.getElementById("rep-from").value = this.from;
-        document.getElementById("rep-to").value = this.to;
-        this._paintQuick();
-        this.render();
+        this.mode = (b.dataset.mode === "day") ? "day" : "range";
+        if (this.mode === "day"){
+          const d = $("rep-day").value || this.to;
+          this.from = this.to = d;
+          this._activeQuick = null;
+        }
+        this._refresh();
       });
+    });
+
+    /* ── single-day picker ── */
+    $("rep-day").addEventListener("change", e=>{
+      if (!e.target.value) return;
+      this.from = this.to = e.target.value;
+      this.mode = "day";
+      this._activeQuick = null;
+      this._refresh();
+    });
+    $("rep-prev").addEventListener("click", ()=>this._shiftDay(-1));
+    $("rep-next").addEventListener("click", ()=>this._shiftDay(+1));
+
+    /* ── range pickers ── */
+    $("rep-from").addEventListener("change", e=>{
+      if (!e.target.value) return;
+      this.from = e.target.value;
+      if (this.from > this.to) this.to = this.from;
+      this.mode = "range";
+      this._activeQuick = null;
+      this._refresh();
+    });
+    $("rep-to").addEventListener("change", e=>{
+      if (!e.target.value) return;
+      this.to = e.target.value;
+      if (this.to < this.from) this.from = this.to;
+      this.mode = "range";
+      this._activeQuick = null;
+      this._refresh();
+    });
+    $("rep-apply").addEventListener("click", ()=>{
+      this._activeQuick = null;
+      this._refresh();
+    });
+
+    /* ── quick presets ── */
+    el.querySelectorAll("[data-q]").forEach(b=>{
+      b.addEventListener("click", ()=>this._applyQuick(b.dataset.q));
     });
 
     /* ───────────────────────────────────────────────────────────
@@ -5960,13 +6150,10 @@ const ReportsPage = {
        The report is printed first (it shows everything that happened
        during the day being closed), then the business day is closed:
        the daily order counter restarts at #0001 and every daily total
-       (orders, revenue, cash, drawer and — since this build — expenses
-       entered for that day before close) starts again from ZERO for
-       the next business day. Expenses remain in the DB, so they still
-       appear in wider ranges (week/month) and general reports.
+       starts again from ZERO for the next business day.
        ─────────────────────────────────────────────────────────── */
-    document.getElementById("rep-print-cc").addEventListener("click", async ()=>{
-      const btn = document.getElementById("rep-print-cc");
+    $("rep-print-cc").addEventListener("click", async ()=>{
+      const btn = $("rep-print-cc");
       if (btn.disabled) return;
       btn.disabled = true;
       try{
@@ -5978,28 +6165,23 @@ const ReportsPage = {
         }
         /* Close the business day — counters & totals reset to zero. */
         DB.resetDayCounter();
-        this.from = todayStr();
-        this.to   = todayStr();
+        this.mode = "day";
+        this.from = this.to = todayStr();
         this._activeQuick = "0";
-        const f  = document.getElementById("rep-from");
-        const tt = document.getElementById("rep-to");
-        if (f)  f.value  = this.from;
-        if (tt) tt.value = this.to;
-        this._paintQuick();
-        this.render();
+        this._refresh();
         try{ POSPage.renderTabs(); POSPage.updateCartFab(); }catch(e){}
         toast(t("day_closed"), "success", 6500);
       } finally {
         btn.disabled = false;
       }
     });
-    document.getElementById("rep-sync-cc").addEventListener("click", async ()=>{
+    $("rep-sync-cc").addEventListener("click", async ()=>{
       if (DB.settings.firebase_enabled !== "1"){ toast(t("cloud_sync_first"), "warning"); return; }
       const res = await CloudSync.pushCloseCash(this.from, this.to);
       if (res.ok) toast(t("close_cash_synced"), "success");
       else toast(t("firebase_sync_failed") + res.info, "error", 5000);
     });
-    document.getElementById("rep-reset").addEventListener("click", ()=>{
+    $("rep-reset").addEventListener("click", ()=>{
       ResetReports.open(()=>{
         this.render();
         POSPage.renderTabs();
@@ -6007,24 +6189,109 @@ const ReportsPage = {
       });
     });
 
-    this._paintQuick();
-    this.render();
+    this._refresh();
   },
 
-  _paintQuick(){
+  /* ═══════════════ CONTROLS / DATE STRIP ═══════════════ */
+  _paintControls(){
+    const $ = id => document.getElementById(id);
     const el = document.getElementById("page-reports");
     if (!el) return;
-    el.querySelectorAll("[data-q]").forEach(b=>{
-      b.classList.toggle("active", String(this._activeQuick) === b.dataset.q);
-    });
+
+    /* mode segment */
+    const seg = $("rep-mode-seg");
+    if (seg){
+      seg.querySelectorAll("button").forEach(b=>
+        b.classList.toggle("on", b.dataset.mode === this.mode));
+    }
+
+    /* show the right row */
+    const dayRow = $("rep-day-row"), rangeRow = $("rep-range-row");
+    if (dayRow)   dayRow.style.display   = (this.mode === "day")   ? "flex" : "none";
+    if (rangeRow) rangeRow.style.display = (this.mode === "range") ? "flex" : "none";
+
+    /* inputs */
+    if ($("rep-day"))  $("rep-day").value  = (this.mode === "day") ? this.from : this.to;
+    if ($("rep-from")) $("rep-from").value = this.from;
+    if ($("rep-to"))   $("rep-to").value   = this.to;
+
+    /* day label + prev/next state */
+    const dl = $("rep-day-lbl");
+    if (dl) dl.textContent = (this.mode === "day") ? fmtDateLong(this.from) : "";
+    const nextBtn = $("rep-next");
+    if (nextBtn) nextBtn.disabled = (this.mode === "day" && this.from >= todayStr());
+
+    /* quick chips */
+    el.querySelectorAll("[data-q]").forEach(b=>
+      b.classList.toggle("active", String(this._activeQuick) === b.dataset.q));
+
+    /* banner */
+    const lbl = $("rep-range-label");
+    if (lbl){
+      if (this.from === this.to){
+        lbl.textContent = t("rep_showing_day", { date: fmtDateLong(this.from) });
+      } else {
+        const n = diffDays(this.from, this.to) + 1;
+        lbl.textContent = t("rep_showing_range", {
+          from: fmtDateLong(this.from), to: fmtDateLong(this.to), n
+        });
+      }
+    }
+
+    this._paintDaysStrip();
   },
 
+  _paintDaysStrip(){
+    const strip = document.getElementById("rep-days-strip");
+    if (!strip) return;
+
+    const days = this._recentDays(45);
+    const rev  = this._dayRevenueMap();
+    const selFrom = this.from, selTo = this.to;
+    const locale = (I18n.lang === "ar") ? "ar" : "en-US";
+
+    strip.innerHTML = days.map(d=>{
+      const inSel = (d >= selFrom && d <= selTo);
+      const r = rev.get(d) || 0;
+      const dt = new Date(d + "T00:00:00");
+      const wd = isNaN(dt.getTime()) ? "" : dt.toLocaleDateString(locale, { weekday:"short" });
+      const dn = d.slice(8);
+      return `<button class="btn chip ${inSel ? "active" : ""}" data-day="${d}"
+                title="${escapeHtml(fmtDateLong(d))} — ${escapeHtml(fmtMoney(r))}"
+                style="display:flex; flex-direction:column; align-items:center;
+                       gap:0; padding:5px 10px; line-height:1.15; min-width:56px;">
+          <span style="font-size:9px; opacity:.7;">${escapeHtml(wd)}</span>
+          <span style="font-size:13px; font-weight:800;">${escapeHtml(dn)}</span>
+          <span style="font-size:9px; opacity:.7;">${r ? escapeHtml(fmtShortMoney(r)) : "—"}</span>
+        </button>`;
+    }).join("") || `<span class="faint" style="font-size:11px;">—</span>`;
+
+    strip.querySelectorAll("[data-day]").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        this.from = this.to = b.dataset.day;
+        this.mode = "day";
+        this._activeQuick = null;
+        this._refresh();
+      });
+    });
+
+    /* keep the selected day visible */
+    const active = strip.querySelector(".chip.active");
+    if (active && active.scrollIntoView){
+      try{ active.scrollIntoView({ block:"nearest", inline:"center", behavior:"smooth" }); }catch(e){}
+    }
+  },
+
+  /* ═══════════════ RENDER DATA ═══════════════ */
   render(){
+    this._paintControls();
+
     const s = this.from, e = this.to;
     const settings = DB.settings;
     const sym = settings.currency_symbol;
     const summ = DB.summary(s, e);
     const profit = summ.revenue - summ.expenses;
+
     const cards = document.getElementById("rep-cards");
     if (cards) cards.innerHTML = `
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("orders"))}</div><div class="val">${summ.orders}</div></div>
@@ -6073,8 +6340,8 @@ const ReportsPage = {
         }).join("");
         ordersEl.querySelectorAll(".order-item").forEach(row=>{
           const id = Number(row.dataset.id);
-          row.addEventListener("click", e=>{
-            if (e.target.closest("button")) return;
+          row.addEventListener("click", ev=>{
+            if (ev.target.closest("button")) return;
             ReportsPage._openReceipt(id);
           });
           row.querySelectorAll("button").forEach(b=>{
