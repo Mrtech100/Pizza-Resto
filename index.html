@@ -686,7 +686,7 @@ const I18N = {
     recent_orders: "📋 Recent Orders",
     reprint: "Reprint",
     view_receipt: "View / Reprint receipt",
-    no_orders_in_range: "No orders in the selected range.",
+    no_orders_in_range: "No orders for this day.",
     order_detail: "Order Detail",
     line_items: "Line Items",
     no_items: "No items.",
@@ -703,7 +703,7 @@ const I18N = {
     reset_day_counter_q: "Reset the order number counter for today?\n\nNew orders will start again at #0001.",
     day_counter_reset: "Day counter reset ✓",
     reset_counter_after_cc: "Also reset the day counter after printing Close Cash",
-        close_cash_hint: "Printing Close Cash closes the day: the report is printed, the day counter and the daily totals are reset, and a new business day starts — the next order will be #0001.",
+    close_cash_hint: "Printing Close Cash closes the day: the report is printed, the day counter and the daily totals are reset, and a new business day starts — the next order will be #0001.",
     day_closed: "Day closed — counters reset to zero, next order will be #0001",
     delivery_fees: "Delivery fees",
     settings: "Settings",
@@ -979,7 +979,7 @@ const I18N = {
     recent_orders: "📋 أحدث الطلبات",
     reprint: "إعادة طباعة",
     view_receipt: "عرض / إعادة طباعة الفاتورة",
-    no_orders_in_range: "لا توجد طلبات في النطاق المحدد.",
+    no_orders_in_range: "لا توجد طلبات في هذا اليوم.",
     order_detail: "تفاصيل الطلب",
     line_items: "بنود الطلب",
     no_items: "لا توجد بنود.",
@@ -996,7 +996,7 @@ const I18N = {
     reset_day_counter_q: "هل تريد تصفير عدّاد أرقام الطلبات لليوم؟\n\nستبدأ الطلبات الجديدة من #0001.",
     day_counter_reset: "تم تصفير عدّاد اليوم ✓",
     reset_counter_after_cc: "أيضاً صفّر عدّاد اليوم بعد طباعة إغلاق الصندوق",
-	close_cash_hint: "طباعة إغلاق الصندوق تُغلق اليوم: يُطبع التقرير، ويُصفَّر عدّاد اليوم وإجماليات اليوم، ويبدأ يوم عمل جديد — الطلب التالي سيكون #0001.",
+    close_cash_hint: "طباعة إغلاق الصندوق تُغلق اليوم: يُطبع التقرير، ويُصفَّر عدّاد اليوم وإجماليات اليوم، ويبدأ يوم عمل جديد — الطلب التالي سيكون #0001.",
     day_closed: "تم إغلاق اليوم — تم تصفير العدّادات، الطلب التالي سيكون #0001",
     delivery_fees: "رسوم التوصيل",
 
@@ -1438,8 +1438,6 @@ function withTimeout(promise, ms){
 }
 function sleep(ms){ return new Promise(r => setTimeout(r, Math.max(0, ms|0))); }
 
-/* ═══════════════════ MISSING HELPERS FOR THE REPORTS PAGE ═══════════════════ */
-
 /* "2025-01-15" → "Wed, Jan 15, 2025" (or Arabic equivalent) */
 function fmtDateLong(dateStr){
   if (!dateStr) return "";
@@ -1452,7 +1450,6 @@ function fmtDateLong(dateStr){
     });
   }catch(e){ return String(dateStr); }
 }
-
 /* Whole-day distance between two YYYY-MM-DD strings (always ≥ 0) */
 function diffDays(fromStr, toStr){
   if (!fromStr || !toStr) return 0;
@@ -1461,8 +1458,7 @@ function diffDays(fromStr, toStr){
   if (isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
   return Math.floor(Math.abs(b - a) / 86400000);
 }
-
-/* Compact money for the day chips: 1,200,000 → "1.2M", 350,000 → "350K" */
+/* Compact money for chips: 1,200,000 → "1.2M", 350,000 → "350K" */
 function fmtShortMoney(v){
   const n = Number(v) || 0;
   const abs = Math.abs(n);
@@ -1471,7 +1467,6 @@ function fmtShortMoney(v){
   if (abs >= 1e3) return Math.round(n / 1e3) + "K";
   return String(Math.round(n));
 }
-
 /* First day of the month that contains `dateStr` → "YYYY-MM-01" */
 function firstOfMonthStr(dateStr){
   const d = new Date((dateStr || todayStr()) + "T00:00:00");
@@ -1479,7 +1474,6 @@ function firstOfMonthStr(dateStr){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
 }
 
-/* ── Wrap text into lines that fit a monospace receipt width ── */
 function wrapText(text, width){
   width = Math.max(4, width|0);
   const words = String(text == null ? "" : text).split(/\s+/).filter(Boolean);
@@ -1502,7 +1496,6 @@ function wrapWithPrefix(prefix, text, width){
   }
   return out;
 }
-
 function concatBytes(){
   let len = 0;
   for (let i = 0; i < arguments.length; i++){
@@ -1517,13 +1510,11 @@ function concatBytes(){
   }
   return out;
 }
-
 let _idCounter = 0;
 function newId(){
   _idCounter = (_idCounter + 1) % 1000;
   return Date.now() * 1000 + ((_idCounter * 7 + Math.floor(Math.random() * 1000)) % 1000);
 }
-
 function sanitize(obj){
   if (Array.isArray(obj)) return obj.map(sanitize);
   if (obj && typeof obj === "object"){
@@ -1538,7 +1529,6 @@ function sanitize(obj){
   if (typeof obj === "number" && !isFinite(obj)) return 0;
   return obj;
 }
-
 function deliveryFeeChoices(){
   const set = new Set([0]);
   for (const v of DELIVERY_FEE_PRESETS){
@@ -3118,7 +3108,7 @@ function buildCloseCashText(start, end, settings){
   if (settings.phone)   lines.push(center(settings.phone));
   lines.push(center("CLOSE CASH REPORT"));
   lines.push(sep("="));
-  lines.push(center(start + "  ->  " + end));
+  lines.push(center(start + (end !== start ? "  ->  " + end : "")));
   lines.push(center(new Date().toLocaleString([], { hour12:false })));
   lines.push(sep("="));
 
@@ -4818,7 +4808,7 @@ const POSPage = {
   },
 };
 
-/* ═══════════════════ RECEIPT DIALOG (editable + reprint) ═══════════════════ */
+/* ═══════════════════ RECEIPT DIALOG ═══════════════════ */
 const ReceiptDialog = {
   _order: null,
   _edited: null,
@@ -5887,166 +5877,99 @@ const ExpensesPage = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   REPORTS PAGE  —  with day/range navigation
+   REPORTS PAGE  —  simple single-day view
+   • "Today" button, "Yesterday" button
+   • Prev / Next day arrows
+   • Custom date picker (any date, up to today)
+   • Close Cash prints the day AND resets the day counter
    ═══════════════════════════════════════════════════════════════════════════ */
 const ReportsPage = {
-  from:null, to:null, mode:"range", initialized:false, _activeQuick:"7",
-  _prefsKey:"reports_view",
+  date: null,
+  initialized: false,
+  _prefsKey: "reports_view_day",
 
   _loadPrefs(){
-    const p = STORE.get(this._prefsKey, null);
-    if (!p || typeof p !== "object") return false;
-    const okDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v||""));
-    if (!okDate(p.from) || !okDate(p.to)) return false;
-    this.mode = (p.mode === "day") ? "day" : "range";
-    this.from = p.from;
-    this.to   = p.to;
-    this._activeQuick = p.quick || null;
-    if (this.from > this.to){ const tmp = this.from; this.from = this.to; this.to = tmp; }
+    const d = STORE.get(this._prefsKey, null);
+    const okDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
+    if (!okDate(d)) return false;
+    this.date = d;
     return true;
   },
   _savePrefs(){
-    try{
-      STORE.set(this._prefsKey, {
-        mode:this.mode, from:this.from, to:this.to,
-        quick:this._activeQuick || null,
-      });
-    }catch(e){}
+    try { STORE.set(this._prefsKey, this.date); } catch (e) {}
   },
-
-  _applyQuick(q){
-    const today = todayStr();
-    if (q === "0"){ this.mode = "day";   this.from = this.to = today; }
-    else if (q === "1"){ this.mode = "day"; this.from = this.to = addDaysStr(today,-1); }
-    else if (q === "7"){ this.mode = "range"; this.from = addDaysStr(today,-7);  this.to = today; }
-    else if (q === "30"){ this.mode = "range"; this.from = addDaysStr(today,-30); this.to = today; }
-    else if (q === "tm"){ this.mode = "range"; this.from = firstOfMonthStr(today); this.to = today; }
-    else if (q === "lm"){
-      const lastEnd = addDaysStr(firstOfMonthStr(today), -1);
-      this.mode = "range"; this.from = firstOfMonthStr(lastEnd); this.to = lastEnd;
-    }
-    this._activeQuick = q;
-    this._refresh();
+  _refresh(){
+    this._savePrefs();
+    this.render();
   },
-
-  _shiftDay(delta){
-    const base = (this.mode === "day") ? this.from : this.to;
-    const next = addDaysStr(base, delta);
-    if (delta > 0 && next > todayStr()) return;
-    this.from = this.to = next;
-    this.mode = "day";
-    this._activeQuick = null;
-    this._refresh();
-  },
-
-  _recentDays(limit){
-    limit = limit || 45;
-    const set = new Set();
-    const today = todayStr();
-    for (let i = 0; i < 14; i++) set.add(addDaysStr(today, -i));
-    for (const o of DB.orders){
-      if (o.status !== "paid") continue;
-      const d = String(o.created_at||"").slice(0,10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) set.add(d);
-    }
-    return [...set].sort((a,b)=> b.localeCompare(a)).slice(0, limit);
-  },
-  _dayRevenueMap(){
-    const m = new Map();
-    for (const o of DB.orders){
-      if (o.status !== "paid") continue;
-      const d = String(o.created_at||"").slice(0,10);
-      if (!d) continue;
-      m.set(d, (m.get(d)||0) + Number(o.total||0));
-    }
-    return m;
-  },
-
-  _refresh(){ this._savePrefs(); this.render(); },
 
   init(){
     if (this.initialized) return;
     this.initialized = true;
-
-    if (!this._loadPrefs()){
-      this.mode = "range";
-      this.from = addDaysStr(todayStr(), -7);
-      this.to   = todayStr();
-      this._activeQuick = "7";
-    } else {
-      const q = this._activeQuick, today = todayStr();
-      if (q === "0"){ this.mode = "day";   this.from = this.to = today; }
-      else if (q === "1"){ this.mode = "day"; this.from = this.to = addDaysStr(today,-1); }
-      else if (q === "7"){ this.mode = "range"; this.from = addDaysStr(today,-7);  this.to = today; }
-      else if (q === "30"){ this.mode = "range"; this.from = addDaysStr(today,-30); this.to = today; }
-      else if (q === "tm"){ this.mode = "range"; this.from = firstOfMonthStr(today); this.to = today; }
-    }
+    if (!this._loadPrefs()) this.date = todayStr();
 
     const el = document.getElementById("page-reports");
+    if (!el){ console.error("[ReportsPage] #page-reports not found"); return; }
+
     el.innerHTML = `
       <div class="page-head"><h1>${escapeHtml(t("reports"))}</h1></div>
 
       <div class="card" style="padding:12px; margin-bottom:12px;">
-
-        <div class="report-controls" style="margin-bottom:10px;">
-          <div class="seg" id="rep-mode-seg">
-            <button data-mode="day">${escapeHtml(t("rep_mode_day"))}</button>
-            <button data-mode="range">${escapeHtml(t("rep_mode_range"))}</button>
-          </div>
-          <div style="flex:1;"></div>
-          <button class="btn chip" data-q="0">${escapeHtml(t("today"))}</button>
-          <button class="btn chip" data-q="1">${escapeHtml(t("rep_yesterday"))}</button>
-          <button class="btn chip" data-q="7">${escapeHtml(t("rep_last7"))}</button>
-          <button class="btn chip" data-q="30">${escapeHtml(t("rep_last30"))}</button>
-          <button class="btn chip" data-q="tm">${escapeHtml(t("rep_this_month"))}</button>
-          <button class="btn chip" data-q="lm">${escapeHtml(t("rep_last_month"))}</button>
-        </div>
-
-        <div id="rep-day-row" class="report-controls" style="margin-bottom:0;">
+        <div class="report-controls" style="margin-bottom:0; flex-wrap:wrap;">
+          <button class="btn chip" id="rep-today">${escapeHtml(t("today"))}</button>
+          <button class="btn chip" id="rep-yesterday">${escapeHtml(t("rep_yesterday"))}</button>
+          <div style="flex:1; min-width:12px;"></div>
           <button class="btn icon" id="rep-prev" title="${escapeHtml(t("rep_prev_day"))}">◀</button>
-          <input type="date" id="rep-day" style="max-width:190px;">
+          <input type="date" id="rep-date" style="max-width:190px;">
           <button class="btn icon" id="rep-next" title="${escapeHtml(t("rep_next_day"))}">▶</button>
-          <span class="muted" id="rep-day-lbl" style="font-weight:700;"></span>
         </div>
-
-        <div id="rep-range-row" class="report-controls" style="margin-bottom:0;">
-          <label class="muted">${escapeHtml(t("from"))}</label>
-          <input type="date" id="rep-from" style="max-width:170px;">
-          <label class="muted">${escapeHtml(t("to"))}</label>
-          <input type="date" id="rep-to" style="max-width:170px;">
-          <button class="btn primary" id="rep-apply">${escapeHtml(t("apply"))}</button>
-        </div>
-
-        <hr class="sep">
-
-        <div class="faint" style="font-size:11px; margin-bottom:6px;">${escapeHtml(t("rep_jump"))}</div>
-        <div class="cat-bar" id="rep-days-strip"></div>
-
-        <div class="muted" id="rep-range-label" style="margin-top:10px; font-weight:700; font-size:12px;"></div>
+        <div class="muted" id="rep-date-lbl"
+             style="margin-top:10px; font-weight:700; font-size:12px;"></div>
       </div>
 
       <div class="cards-row" id="rep-cards"></div>
+
       <div class="report-grid">
-        <div class="card report-box"><h3>${escapeHtml(t("top_products"))}</h3>
-          <table><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("qty"))}</th><th>${escapeHtml(t("revenue"))}</th></tr></thead>
-          <tbody id="rep-top"></tbody></table></div>
-        <div class="card report-box"><h3>${escapeHtml(t("sales_by_category"))}</h3>
-          <table><thead><tr><th>${escapeHtml(t("category"))}</th><th>${escapeHtml(t("revenue"))}</th></tr></thead>
-          <tbody id="rep-cat"></tbody></table></div>
-        <div class="card report-box"><h3>${escapeHtml(t("payment_methods"))}</h3>
-          <table><thead><tr><th>${escapeHtml(t("method"))}</th><th>${escapeHtml(t("count"))}</th><th>${escapeHtml(t("revenue"))}</th></tr></thead>
-          <tbody id="rep-pm"></tbody></table></div>
+        <div class="card report-box">
+          <h3>${escapeHtml(t("top_products"))}</h3>
+          <table>
+            <thead><tr>
+              <th>${escapeHtml(t("name"))}</th>
+              <th>${escapeHtml(t("qty"))}</th>
+              <th>${escapeHtml(t("revenue"))}</th>
+            </tr></thead>
+            <tbody id="rep-top"></tbody>
+          </table>
+        </div>
+        <div class="card report-box">
+          <h3>${escapeHtml(t("sales_by_category"))}</h3>
+          <table>
+            <thead><tr>
+              <th>${escapeHtml(t("category"))}</th>
+              <th>${escapeHtml(t("revenue"))}</th>
+            </tr></thead>
+            <tbody id="rep-cat"></tbody>
+          </table>
+        </div>
+        <div class="card report-box">
+          <h3>${escapeHtml(t("payment_methods"))}</h3>
+          <table>
+            <thead><tr>
+              <th>${escapeHtml(t("method"))}</th>
+              <th>${escapeHtml(t("count"))}</th>
+              <th>${escapeHtml(t("revenue"))}</th>
+            </tr></thead>
+            <tbody id="rep-pm"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="card report-box" style="margin-bottom:12px;">
-        <h3>${escapeHtml(t("daily_sales"))}</h3>
-        <table><thead><tr><th>${escapeHtml(t("date"))}</th><th>${escapeHtml(t("orders"))}</th><th>${escapeHtml(t("revenue"))}</th></tr></thead>
-        <tbody id="rep-days"></tbody></table>
-      </div>
+
       <div class="card report-box" style="margin-bottom:12px;">
         <h3>${escapeHtml(t("recent_orders"))}</h3>
         <div class="orders-list" id="rep-orders"></div>
       </div>
-        <div class="card" style="padding:14px;">
+
+      <div class="card" style="padding:14px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <h3 style="flex:1; min-width:120px;">${escapeHtml(t("close_cash"))}</h3>
           <button class="btn primary" id="rep-print-cc">${escapeHtml(t("print_close_cash"))}</button>
@@ -6057,6 +5980,7 @@ const ReportsPage = {
         </div>
         <div class="muted" id="rep-cc-info" style="margin-top:8px;"></div>
       </div>
+
       <div class="card danger-card" style="padding:14px; margin-top:12px;">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <div style="flex:1; min-width:180px;">
@@ -6071,83 +5995,58 @@ const ReportsPage = {
 
     const $ = id => document.getElementById(id);
 
-    $("rep-mode-seg").querySelectorAll("button").forEach(b=>{
-      b.addEventListener("click", ()=>{
-        this.mode = (b.dataset.mode === "day") ? "day" : "range";
-        if (this.mode === "day"){
-          const d = $("rep-day").value || this.to;
-          this.from = this.to = d;
-          this._activeQuick = null;
-        }
+    const dateInput = $("rep-date");
+    if (dateInput){
+      dateInput.addEventListener("change", e => {
+        if (!e.target.value) return;
+        this.date = e.target.value;
         this._refresh();
       });
-    });
-
-    $("rep-day").addEventListener("change", e=>{
-      if (!e.target.value) return;
-      this.from = this.to = e.target.value;
-      this.mode = "day";
-      this._activeQuick = null;
-      this._refresh();
-    });
-    $("rep-prev").addEventListener("click", ()=>this._shiftDay(-1));
-    $("rep-next").addEventListener("click", ()=>this._shiftDay(+1));
-
-    $("rep-from").addEventListener("change", e=>{
-      if (!e.target.value) return;
-      this.from = e.target.value;
-      if (this.from > this.to) this.to = this.from;
-      this.mode = "range";
-      this._activeQuick = null;
-      this._refresh();
-    });
-    $("rep-to").addEventListener("change", e=>{
-      if (!e.target.value) return;
-      this.to = e.target.value;
-      if (this.to < this.from) this.from = this.to;
-      this.mode = "range";
-      this._activeQuick = null;
-      this._refresh();
-    });
-    $("rep-apply").addEventListener("click", ()=>{
-      this._activeQuick = null;
+    }
+    if ($("rep-today"))     $("rep-today").addEventListener("click", () => { this.date = todayStr(); this._refresh(); });
+    if ($("rep-yesterday")) $("rep-yesterday").addEventListener("click", () => { this.date = addDaysStr(todayStr(), -1); this._refresh(); });
+    if ($("rep-prev"))      $("rep-prev").addEventListener("click", () => { this.date = addDaysStr(this.date, -1); this._refresh(); });
+    if ($("rep-next"))      $("rep-next").addEventListener("click", () => {
+      const n = addDaysStr(this.date, +1);
+      if (n > todayStr()) return;
+      this.date = n;
       this._refresh();
     });
 
-    el.querySelectorAll("[data-q]").forEach(b=>{
-      b.addEventListener("click", ()=>this._applyQuick(b.dataset.q));
-    });
-
-    $("rep-print-cc").addEventListener("click", async ()=>{
+    if ($("rep-print-cc")) $("rep-print-cc").addEventListener("click", async () => {
       const btn = $("rep-print-cc");
-      if (btn.disabled) return;
+      if (!btn || btn.disabled) return;
       btn.disabled = true;
-      try{
-        const text = buildCloseCashText(this.from, this.to, DB.settings);
-        const res  = await Printer.printText(text, DB.settings);
+      try {
+        const text = buildCloseCashText(this.date, this.date, DB.settings);
+        const res = await Printer.printText(text, DB.settings);
         if (!res || res.ok === false){
           toast(t("printing_fail"), "error", 5000);
           return;
         }
+        // Day closed → reset the day counter so the next order is #0001
         DB.resetDayCounter();
-        this.mode = "day";
-        this.from = this.to = todayStr();
-        this._activeQuick = "0";
+        this.date = todayStr();
         this._refresh();
-        try{ POSPage.renderTabs(); POSPage.updateCartFab(); }catch(e){}
+        try { POSPage.renderTabs(); POSPage.updateCartFab(); } catch(e){}
         toast(t("day_closed"), "success", 6500);
       } finally {
         btn.disabled = false;
       }
     });
-    $("rep-sync-cc").addEventListener("click", async ()=>{
-      if (DB.settings.firebase_enabled !== "1"){ toast(t("cloud_sync_first"), "warning"); return; }
-      const res = await CloudSync.pushCloseCash(this.from, this.to);
+
+    if ($("rep-sync-cc")) $("rep-sync-cc").addEventListener("click", async () => {
+      if (DB.settings.firebase_enabled !== "1"){
+        toast(t("cloud_sync_first"), "warning");
+        return;
+      }
+      const res = await CloudSync.pushCloseCash(this.date, this.date);
       if (res.ok) toast(t("close_cash_synced"), "success");
       else toast(t("firebase_sync_failed") + res.info, "error", 5000);
     });
-    $("rep-reset").addEventListener("click", ()=>{
-      ResetReports.open(()=>{
+
+    if ($("rep-reset")) $("rep-reset").addEventListener("click", () => {
+      ResetReports.open(() => {
         this.render();
         POSPage.renderTabs();
         POSPage.updateCartFab();
@@ -6157,98 +6056,33 @@ const ReportsPage = {
     this._refresh();
   },
 
-  _paintControls(){
-    const $ = id => document.getElementById(id);
-    const el = document.getElementById("page-reports");
-    if (!el) return;
-
-    const seg = $("rep-mode-seg");
-    if (seg){
-      seg.querySelectorAll("button").forEach(b=>
-        b.classList.toggle("on", b.dataset.mode === this.mode));
-    }
-
-    const dayRow = $("rep-day-row"), rangeRow = $("rep-range-row");
-    if (dayRow)   dayRow.style.display   = (this.mode === "day")   ? "flex" : "none";
-    if (rangeRow) rangeRow.style.display = (this.mode === "range") ? "flex" : "none";
-
-    if ($("rep-day"))  $("rep-day").value  = (this.mode === "day") ? this.from : this.to;
-    if ($("rep-from")) $("rep-from").value = this.from;
-    if ($("rep-to"))   $("rep-to").value   = this.to;
-
-    const dl = $("rep-day-lbl");
-    if (dl) dl.textContent = (this.mode === "day") ? fmtDateLong(this.from) : "";
-    const nextBtn = $("rep-next");
-    if (nextBtn) nextBtn.disabled = (this.mode === "day" && this.from >= todayStr());
-
-    el.querySelectorAll("[data-q]").forEach(b=>
-      b.classList.toggle("active", String(this._activeQuick) === b.dataset.q));
-
-    const lbl = $("rep-range-label");
-    if (lbl){
-      if (this.from === this.to){
-        lbl.textContent = t("rep_showing_day", { date: fmtDateLong(this.from) });
-      } else {
-        const n = diffDays(this.from, this.to) + 1;
-        lbl.textContent = t("rep_showing_range", {
-          from: fmtDateLong(this.from), to: fmtDateLong(this.to), n
-        });
-      }
-    }
-
-    this._paintDaysStrip();
-  },
-
-  _paintDaysStrip(){
-    const strip = document.getElementById("rep-days-strip");
-    if (!strip) return;
-
-    const days = this._recentDays(45);
-    const rev  = this._dayRevenueMap();
-    const selFrom = this.from, selTo = this.to;
-    const locale = (I18n.lang === "ar") ? "ar" : "en-US";
-
-    strip.innerHTML = days.map(d=>{
-      const inSel = (d >= selFrom && d <= selTo);
-      const r = rev.get(d) || 0;
-      const dt = new Date(d + "T00:00:00");
-      const wd = isNaN(dt.getTime()) ? "" : dt.toLocaleDateString(locale, { weekday:"short" });
-      const dn = d.slice(8);
-      return `<button class="btn chip ${inSel ? "active" : ""}" data-day="${d}"
-                title="${escapeHtml(fmtDateLong(d))} — ${escapeHtml(fmtMoney(r))}"
-                style="display:flex; flex-direction:column; align-items:center;
-                       gap:0; padding:5px 10px; line-height:1.15; min-width:56px;">
-          <span style="font-size:9px; opacity:.7;">${escapeHtml(wd)}</span>
-          <span style="font-size:13px; font-weight:800;">${escapeHtml(dn)}</span>
-          <span style="font-size:9px; opacity:.7;">${r ? escapeHtml(fmtShortMoney(r)) : "—"}</span>
-        </button>`;
-    }).join("") || `<span class="faint" style="font-size:11px;">—</span>`;
-
-    strip.querySelectorAll("[data-day]").forEach(b=>{
-      b.addEventListener("click", ()=>{
-        this.from = this.to = b.dataset.day;
-        this.mode = "day";
-        this._activeQuick = null;
-        this._refresh();
-      });
-    });
-
-    const active = strip.querySelector(".chip.active");
-    if (active && active.scrollIntoView){
-      try{ active.scrollIntoView({ block:"nearest", inline:"center", behavior:"smooth" }); }catch(e){}
-    }
-  },
-
   render(){
-    this._paintControls();
+    const $ = id => document.getElementById(id);
+    const d = this.date || todayStr();
+    const today = todayStr();
 
-    const s = this.from, e = this.to;
+    const dateInput = $("rep-date");
+    if (dateInput){
+      dateInput.value = d;
+      dateInput.max = today;
+    }
+    const lbl = $("rep-date-lbl");
+    if (lbl){
+      const suffix = (d === today) ? "  •  " + t("today") : "";
+      lbl.textContent = t("rep_showing_day", { date: fmtDateLong(d) }) + suffix;
+    }
+    const nextBtn = $("rep-next");
+    if (nextBtn) nextBtn.disabled = (d >= today);
+    const prevBtn = $("rep-prev");
+    if (prevBtn) prevBtn.disabled = false;
+
+    const s = d, e = d;
     const settings = DB.settings;
     const sym = settings.currency_symbol;
     const summ = DB.summary(s, e);
     const profit = summ.revenue - summ.expenses;
 
-    const cards = document.getElementById("rep-cards");
+    const cards = $("rep-cards");
     if (cards) cards.innerHTML = `
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("orders"))}</div><div class="val">${summ.orders}</div></div>
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("revenue"))}</div><div class="val">${fmtMoney(summ.revenue, sym)}</div></div>
@@ -6256,51 +6090,63 @@ const ReportsPage = {
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("expenses"))}</div><div class="val">${fmtMoney(summ.expenses, sym)}</div></div>
       <div class="card metric-card"><div class="lbl">${escapeHtml(t("net_profit"))}</div><div class="val">${fmtMoney(profit, sym)}</div></div>`;
 
-    const tTop = document.getElementById("rep-top");
-    if (tTop) tTop.innerHTML = DB.topProducts(s,e).map(r=>
-      `<tr><td>${escapeHtml(r.name)}</td><td>${r.qty|0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
-    const tCat = document.getElementById("rep-cat");
-    if (tCat) tCat.innerHTML = DB.salesByCategory(s,e).map(r=>
-      `<tr><td>${escapeHtml(r.category)}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
-    const tPm = document.getElementById("rep-pm");
-    if (tPm) tPm.innerHTML = DB.salesByMethod(s,e).map(r=>
-      `<tr><td>${escapeHtml(r.method)}</td><td>${r.c}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
-    const tDays = document.getElementById("rep-days");
-    if (tDays) tDays.innerHTML = DB.salesByDay(s,e).map(r=>
-      `<tr><td>${escapeHtml(r.day)}</td><td>${r.orders}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("");
+    const emptyRow = cols => `<tr><td colspan="${cols}" class="faint" style="text-align:center; padding:10px;">—</td></tr>`;
 
-    const ordersEl = document.getElementById("rep-orders");
+    const tTop = $("rep-top");
+    if (tTop){
+      const rows = DB.topProducts(s, e);
+      tTop.innerHTML = rows.length
+        ? rows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td>${r.qty | 0}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("")
+        : emptyRow(3);
+    }
+
+    const tCat = $("rep-cat");
+    if (tCat){
+      const rows = DB.salesByCategory(s, e);
+      tCat.innerHTML = rows.length
+        ? rows.map(r => `<tr><td>${escapeHtml(r.category)}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("")
+        : emptyRow(2);
+    }
+
+    const tPm = $("rep-pm");
+    if (tPm){
+      const rows = DB.salesByMethod(s, e);
+      tPm.innerHTML = rows.length
+        ? rows.map(r => `<tr><td>${escapeHtml(r.method)}</td><td>${r.c}</td><td>${fmtMoney(r.revenue, sym)}</td></tr>`).join("")
+        : emptyRow(3);
+    }
+
+    const ordersEl = $("rep-orders");
     if (ordersEl){
       const orders = DB.paidOrdersWithItems(s, e);
       if (!orders.length){
         ordersEl.innerHTML = `<div class="held-empty">${escapeHtml(t("no_orders_in_range"))}</div>`;
       } else {
-        ordersEl.innerHTML = orders.map(o=>{
-          const num = String(o.order_no||"").split("-").pop();
-          const when = (o.created_at||"").slice(11,16);
-          const date = (o.created_at||"").slice(5,10);
+        ordersEl.innerHTML = orders.map(o => {
+          const num = String(o.order_no || "").split("-").pop();
+          const when = (o.created_at || "").slice(11, 16);
           return `<div class="order-item" data-id="${o.id}">
             <div class="ono">#${escapeHtml(num)}</div>
             <div class="ocust">${escapeHtml(o.customer_name || "—")}</div>
-            <div class="otime">${escapeHtml(date)} ${escapeHtml(when)}</div>
+            <div class="otime">${escapeHtml(when)}</div>
             <div class="ototal">${fmtMoney(o.total, sym)}</div>
             <div class="oact">
               <button class="btn icon" data-act="receipt" title="${escapeHtml(t("view_receipt"))}">🧾</button>
               <button class="btn icon" data-act="reprint" title="${escapeHtml(t("reprint"))}">🖨</button>
               <button class="btn icon" data-act="edit" title="${escapeHtml(t("order_edit"))}">✏️</button>
-              <button class="btn icon" data-act="del" style="color:var(--danger);"
-                      title="${escapeHtml(t("delete_order"))}">🗑</button>
+              <button class="btn icon" data-act="del" style="color:var(--danger);" title="${escapeHtml(t("delete_order"))}">🗑</button>
             </div>
           </div>`;
         }).join("");
-        ordersEl.querySelectorAll(".order-item").forEach(row=>{
+
+        ordersEl.querySelectorAll(".order-item").forEach(row => {
           const id = Number(row.dataset.id);
-          row.addEventListener("click", ev=>{
+          row.addEventListener("click", ev => {
             if (ev.target.closest("button")) return;
             ReportsPage._openReceipt(id);
           });
-          row.querySelectorAll("button").forEach(b=>{
-            b.addEventListener("click", async ev=>{
+          row.querySelectorAll("button").forEach(b => {
+            b.addEventListener("click", async ev => {
               ev.stopPropagation();
               const act = b.dataset.act;
               if (act === "receipt"){
@@ -6321,16 +6167,18 @@ const ReportsPage = {
       }
     }
 
-    const cash = DB.cashSummary(s,e);
-    const info = document.getElementById("rep-cc-info");
-    if (info) info.innerHTML =
-      `<b>${escapeHtml(t("cash_orders"))}:</b> ${cash.cash_orders} • ` +
-      `<b>${escapeHtml(t("cash_sales"))}:</b> ${fmtMoney(cash.cash_sales, sym)} ` +
-      `<span class="faint">(${fmtMoneySecondary(cash.cash_sales, settings)})</span> • ` +
-      `<b>${escapeHtml(t("expenses"))}:</b> ${fmtMoney(cash.expenses, sym)} ` +
-      `<span class="faint">(${fmtMoneySecondary(cash.expenses, settings)})</span><br>` +
-      `<b>${escapeHtml(t("expected_drawer"))}:</b> ${fmtMoney(cash.expected, sym)} ` +
-      `<span class="faint">(${fmtMoneySecondary(cash.expected, settings)})</span>`;
+    const cash = DB.cashSummary(s, e);
+    const info = $("rep-cc-info");
+    if (info){
+      info.innerHTML =
+        `<b>${escapeHtml(t("cash_orders"))}:</b> ${cash.cash_orders} • ` +
+        `<b>${escapeHtml(t("cash_sales"))}:</b> ${fmtMoney(cash.cash_sales, sym)} ` +
+        `<span class="faint">(${fmtMoneySecondary(cash.cash_sales, settings)})</span> • ` +
+        `<b>${escapeHtml(t("expenses"))}:</b> ${fmtMoney(cash.expenses, sym)} ` +
+        `<span class="faint">(${fmtMoneySecondary(cash.expenses, settings)})</span><br>` +
+        `<b>${escapeHtml(t("expected_drawer"))}:</b> ${fmtMoney(cash.expected, sym)} ` +
+        `<span class="faint">(${fmtMoneySecondary(cash.expected, settings)})</span>`;
+    }
   },
 
   _openReceipt(orderId){
@@ -6340,29 +6188,29 @@ const ReportsPage = {
   },
 
   _editOrder(orderId){
-    OrderEditor.open(orderId, ()=>{
+    OrderEditor.open(orderId, () => {
       this.render();
-      try{
+      try {
         POSPage.renderProducts();
         POSPage.renderTabs();
         POSPage.updateCartFab();
-      }catch(e){}
+      } catch(e){}
     });
   },
 
   _deleteOrder(orderId){
-    const o = DB.orders.find(x=>x.id === orderId);
+    const o = DB.orders.find(x => x.id === orderId);
     if (!o){ toast("Order not found", "error"); return; }
     if (!confirm(t("delete_order_q"))) return;
-    const ok = DB.deletePaidOrder(orderId, { restock:true });
+    const ok = DB.deletePaidOrder(orderId, { restock: true });
     if (!ok){ toast("Order not found", "error"); return; }
     toast(t("order_deleted"), "success");
     this.render();
-    try{
+    try {
       POSPage.renderProducts();
       POSPage.renderTabs();
       POSPage.updateCartFab();
-    }catch(e){}
+    } catch(e){}
   },
 };
 
