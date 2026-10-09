@@ -1414,10 +1414,67 @@ function fmtMoneySecondary(v, s){
 }
 function fmtMoneyDual(v, s){ return fmtMoney(v, s && s.currency_symbol) + "  (" + fmtMoneySecondary(v, s) + ")"; }
 function nowIso(){ return new Date().toISOString(); }
-function todayStr(){
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+/* ══════════════════════════════════════════════════════════════════
+   LEBANON CALENDAR HELPERS
+   Everything the POS shows and stores as a "day" is anchored to
+   Asia/Beirut, and every display uses the Lebanon format DD/MM/YYYY.
+   ══════════════════════════════════════════════════════════════════ */
+const LB_TZ = "Asia/Beirut";
+
+/* Any ISO string / Date → Lebanon local "YYYY-MM-DD". */
+function lbDateStr(input){
+  if (!input) return "";
+  const d = (input instanceof Date) ? input : new Date(input);
+  if (isNaN(d.getTime())) return String(input).slice(0,10);
+  try{
+    const p = new Intl.DateTimeFormat("en-CA", {
+      timeZone: LB_TZ, year:"numeric", month:"2-digit", day:"2-digit",
+    }).formatToParts(d);
+    const y  = p.find(x=>x.type==="year").value;
+    const m  = p.find(x=>x.type==="month").value;
+    const dd = p.find(x=>x.type==="day").value;
+    return `${y}-${m}-${dd}`;
+  }catch(e){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
 }
+
+/* Any ISO string / Date → Lebanon local "HH:MM" (24 h). */
+function lbTimeStr(input){
+  if (!input) return "";
+  const d = (input instanceof Date) ? input : new Date(input);
+  if (isNaN(d.getTime())) return "";
+  try{
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: LB_TZ, hour:"2-digit", minute:"2-digit", hour12:false,
+    }).format(d);
+  }catch(e){
+    return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
+}
+
+/* "YYYY-MM-DD" (internal) → "DD/MM/YYYY" (Lebanon display). */
+function lbDisplayDate(dateStr){
+  if (!dateStr) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr));
+  if (!m) return String(dateStr);
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+/* Any ISO string / Date → "DD/MM/YYYY HH:MM" (Lebanon display). */
+function lbDisplayDateTime(input){
+  if (!input) return "";
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return String(input);
+  return lbDisplayDate(lbDateStr(d)) + " " + lbTimeStr(d);
+}
+
+/* Today's date in Lebanon, formatted as "YYYY-MM-DD" (internal storage). */
+function todayStr(){
+  return lbDateStr(new Date());
+}
+
 function addDaysStr(dateStr, days){
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + days);
@@ -1438,19 +1495,21 @@ function withTimeout(promise, ms){
 }
 function sleep(ms){ return new Promise(r => setTimeout(r, Math.max(0, ms|0))); }
 
-/* "2025-01-15" → "Wed, Jan 15, 2025" (or Arabic equivalent) */
+/* "2025-01-15" → "Wed 15/01/2025" (Lebanon display). */
 function fmtDateLong(dateStr){
   if (!dateStr) return "";
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return String(dateStr);
-  const locale = (I18n && I18n.lang === "ar") ? "ar" : "en-US";
+  const d = new Date(dateStr + "T12:00:00");
+  if (isNaN(d.getTime())) return lbDisplayDate(dateStr);
+  const disp = lbDisplayDate(dateStr);
   try{
-    return d.toLocaleDateString(locale, {
-      weekday:"short", year:"numeric", month:"short", day:"numeric"
-    });
-  }catch(e){ return String(dateStr); }
+    const wd = new Intl.DateTimeFormat("en-GB", {
+      timeZone: LB_TZ, weekday:"short",
+    }).format(d);
+    return `${wd} ${disp}`;
+  }catch(e){ return disp; }
 }
-/* Whole-day distance between two YYYY-MM-DD strings (always ≥ 0) */
+
+/* Whole-day distance between two YYYY-MM-DD strings (always ≥ 0). */
 function diffDays(fromStr, toStr){
   if (!fromStr || !toStr) return 0;
   const a = new Date(fromStr + "T00:00:00");
@@ -1458,7 +1517,6 @@ function diffDays(fromStr, toStr){
   if (isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
   return Math.floor(Math.abs(b - a) / 86400000);
 }
-/* Compact money for chips: 1,200,000 → "1.2M", 350,000 → "350K" */
 function fmtShortMoney(v){
   const n = Number(v) || 0;
   const abs = Math.abs(n);
@@ -1467,7 +1525,6 @@ function fmtShortMoney(v){
   if (abs >= 1e3) return Math.round(n / 1e3) + "K";
   return String(Math.round(n));
 }
-/* First day of the month that contains `dateStr` → "YYYY-MM-01" */
 function firstOfMonthStr(dateStr){
   const d = new Date((dateStr || todayStr()) + "T00:00:00");
   if (isNaN(d.getTime())) return todayStr();
@@ -2317,8 +2374,8 @@ const DB = {
   },
 
   nextOrderNo(){
-    const d = new Date();
-    const day = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+    /* Order numbers are per Lebanon local day (YYYYMMDD). */
+    const day = todayStr().replace(/-/g, "");
     const pref = `ORD-${day}-`;
     const startIso = this.settings.day_start_iso || "";
     let n = 0;
@@ -2330,6 +2387,7 @@ const DB = {
     return pref + String(n+1).padStart(4,"0");
   },
   resetDayCounter(){
+    /* Still stamped so the next order after Close Cash is #0001. */
     this.settings.day_start_iso = nowIso();
     this.save("settings");
     Persist.putObject("settings", this.settings);
@@ -2518,30 +2576,23 @@ const DB = {
     Persist.remove("expenses", id);
   },
 
+  /* ──────────────────────────────────────────────────────────────
+     REPORT FILTERS — anchored to Lebanon local days.
+     The old `day_start_iso` cut has been removed so no order is
+     ever hidden; the counter reset still works via nextOrderNo().
+     ────────────────────────────────────────────────────────────── */
   _paidOrdersInRange(s, e){
-    const dayStart = String(this.settings.day_start_iso || "");
-    const dayDate  = dayStart ? dayStart.slice(0,10) : "";
-    const cutApplies = !!(dayStart && dayDate && dayDate >= s && dayDate <= e);
     return this.orders.filter(o => {
       if (o.status !== "paid") return false;
-      const d = (o.created_at||"").slice(0,10);
-      if (d < s || d > e) return false;
-      if (cutApplies && (o.created_at||"") < dayStart) return false;
-      return true;
+      const d = lbDateStr(o.created_at);
+      return d >= s && d <= e;
     });
   },
 
   _expensesInRange(s, e){
-    const dayStart = String(this.settings.day_start_iso || "");
-    const dayDate  = dayStart ? dayStart.slice(0,10) : "";
-    const cutApplies = !!(dayStart && dayDate && dayDate >= s && dayDate <= e);
     return this.expenses.filter(x => {
-      const d = x.spent_on || "";
-      if (d < s || d > e) return false;
-      if (cutApplies && d === dayDate && x.created_at && x.created_at < dayStart){
-        return false;
-      }
-      return true;
+      const d = x.spent_on || lbDateStr(x.created_at);
+      return d >= s && d <= e;
     });
   },
 
@@ -2626,7 +2677,7 @@ const DB = {
     const os = this._paidOrdersInRange(s, e);
     const map = new Map();
     for (const o of os){
-      const d = (o.created_at||"").slice(0,10);
+      const d = lbDateStr(o.created_at);
       if (!map.has(d)) map.set(d, { day:d, orders:0, revenue:0 });
       const r = map.get(d);
       r.orders++; r.revenue += Number(o.total||0);
@@ -2978,7 +3029,8 @@ function buildReceiptText(order, settings, copyLabel=""){
     lines.push(center("*** " + copyLabel + " ***"));
     lines.push(sep("-"));
   }
-  const when = new Date().toLocaleString([], { hour12:false });
+  /* Lebanon local date + time */
+  const when = lbDisplayDate(todayStr()) + " " + lbTimeStr(new Date());
   lines.push(lr("Order: " + order.no, when));
   if (order.customer_name) lines.push("Customer: " + order.customer_name);
   if (order.customer_phone) lines.push("Phone: " + order.customer_phone);
@@ -3038,7 +3090,7 @@ function buildEscPosBody(order, settings, copyLabel){
     p.align(0);
     p.line(sep("-"));
   }
-  const when = new Date().toLocaleString([], { hour12:false });
+  const when = lbDisplayDate(todayStr()) + " " + lbTimeStr(new Date());
   p.line(lr("Order: " + order.no, when));
   if (order.customer_name) p.line("Customer: " + order.customer_name);
   if (order.customer_phone) p.line("Phone: " + order.customer_phone);
@@ -3108,8 +3160,11 @@ function buildCloseCashText(start, end, settings){
   if (settings.phone)   lines.push(center(settings.phone));
   lines.push(center("CLOSE CASH REPORT"));
   lines.push(sep("="));
-  lines.push(center(start + (end !== start ? "  ->  " + end : "")));
-  lines.push(center(new Date().toLocaleString([], { hour12:false })));
+  /* Lebanon display: DD/MM/YYYY */
+  const rangeLabel = lbDisplayDate(start) +
+    (end !== start ? "  ->  " + lbDisplayDate(end) : "");
+  lines.push(center(rangeLabel));
+  lines.push(center(lbDisplayDate(todayStr()) + " " + lbTimeStr(new Date())));
   lines.push(sep("="));
 
   const allOrders  = DB.paidOrdersWithItems(start, end);
@@ -3130,11 +3185,11 @@ function buildCloseCashText(start, end, settings){
     let grandItems = 0;
     let grandLines = 0;
 
-    for (let idx = 0; idx < cashOrders.length; idx++){
+    for (let idx = 0; idx < cashOrders.length; idx++) {
       const o = cashOrders[idx];
       const no   = String(o.order_no || "").split("-").pop();
-      const when = (o.created_at || "").slice(11,16);
-      const date = (o.created_at || "").slice(0,10);
+      const when = lbTimeStr(o.created_at);
+      const date = lbDisplayDate(lbDateStr(o.created_at));
 
       lines.push("");
       lines.push(sep("-"));
@@ -3225,7 +3280,7 @@ function buildCloseCashText(start, end, settings){
     lines.push(sep("-"));
   } else {
     for (const e of expenses){
-      const left = ("  " + (e.spent_on||"") + " " +
+      const left = ("  " + lbDisplayDate(e.spent_on||"") + " " +
                     (e.category||"") + ": " + (e.description||"")).slice(0, 30);
       lines.push(lr(left, fmtMoney(e.amount||0, sym)));
     }
@@ -3841,7 +3896,7 @@ const ResetReports = {
     } else {
       const ids = new Set();
       for (const o of DB.orders){
-        const d = (o.created_at||"").slice(0,10);
+        const d = lbDateStr(o.created_at);
         if (d >= from && d <= to) ids.add(o.id);
       }
       ordersN = ids.size;
@@ -3856,11 +3911,9 @@ const ResetReports = {
   async run(scope, from, to){
     const orderIds = new Set();
     for (const o of DB.orders){
-      if (scope === "all") orderIds.add(o.id);
-      else {
-        const d = (o.created_at||"").slice(0,10);
-        if (d >= from && d <= to) orderIds.add(o.id);
-      }
+      if (scope === "all") { orderIds.add(o.id); continue; }
+      const d = lbDateStr(o.created_at);
+      if (d >= from && d <= to) orderIds.add(o.id);
     }
     if (CloudDB.ready){
       try{
@@ -4126,7 +4179,7 @@ const POSPage = {
             <div class="hno">#${escapeHtml(String(o.order_no||"").split("-").pop())}</div>
             <div class="hinfo">
               <div class="hcust">${escapeHtml(o.customer_name || "—")}</div>
-              <div>${itemCount} ${escapeHtml(t("items_count_short"))} • ${escapeHtml((o.created_at||"").slice(11,19))}</div>
+              <div>${itemCount} ${escapeHtml(t("items_count_short"))} • ${escapeHtml(lbTimeStr(o.created_at))}</div>
             </div>
             <div class="htotal">${fmtMoney(o.total)}</div>
             <div class="hactions">
@@ -5034,7 +5087,7 @@ const OrderEditor = {
   _shell(){
     const o = this._row;
     const num = String(o.order_no||"").split("-").pop();
-    const when = (o.created_at||"").replace("T"," ").slice(0,16);
+    const when = lbDisplayDate(lbDateStr(o.created_at)) + " " + lbTimeStr(o.created_at);
     const pay = o.payment_method || "Cash";
     return `
       <div class="m-head">
@@ -5821,7 +5874,7 @@ const ExpensesPage = {
     if (!tb) return;
     tb.innerHTML = rows.map(r=>`
       <tr data-id="${r.id}">
-        <td>${escapeHtml(r.spent_on||"")}</td>
+        <td>${escapeHtml(lbDisplayDate(r.spent_on||""))}</td>
         <td>${escapeHtml(r.category||"")}</td>
         <td>${escapeHtml(r.description||"")}</td>
         <td>${fmtMoney(r.amount, sym)}</td>
@@ -5877,11 +5930,12 @@ const ExpensesPage = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   REPORTS PAGE  —  simple single-day view
+   REPORTS PAGE  —  simple single-day view (Lebanon calendar)
    • "Today" button, "Yesterday" button
    • Prev / Next day arrows
    • Custom date picker (any date, up to today)
-   • Close Cash prints the day AND resets the day counter
+   • Close Cash prints the day AND resets the order-number counter
+     — but does NOT hide historical orders from reports.
    ═══════════════════════════════════════════════════════════════════════════ */
 const ReportsPage = {
   date: null,
@@ -6024,7 +6078,8 @@ const ReportsPage = {
           toast(t("printing_fail"), "error", 5000);
           return;
         }
-        // Day closed → reset the day counter so the next order is #0001
+        /* Day closed → reset the day counter so the next order is #0001.
+           Historical orders stay visible in reports. */
         DB.resetDayCounter();
         this.date = todayStr();
         this._refresh();
@@ -6069,7 +6124,9 @@ const ReportsPage = {
     const lbl = $("rep-date-lbl");
     if (lbl){
       const suffix = (d === today) ? "  •  " + t("today") : "";
-      lbl.textContent = t("rep_showing_day", { date: fmtDateLong(d) }) + suffix;
+      /* Show both the internal ISO and the Lebanon format for clarity. */
+      lbl.textContent = t("rep_showing_day", { date: fmtDateLong(d) }) + suffix +
+        "   (" + lbDisplayDate(d) + ")";
     }
     const nextBtn = $("rep-next");
     if (nextBtn) nextBtn.disabled = (d >= today);
@@ -6124,7 +6181,7 @@ const ReportsPage = {
       } else {
         ordersEl.innerHTML = orders.map(o => {
           const num = String(o.order_no || "").split("-").pop();
-          const when = (o.created_at || "").slice(11, 16);
+          const when = lbTimeStr(o.created_at);
           return `<div class="order-item" data-id="${o.id}">
             <div class="ono">#${escapeHtml(num)}</div>
             <div class="ocust">${escapeHtml(o.customer_name || "—")}</div>
@@ -6494,6 +6551,7 @@ const SettingsPage = {
         `Cloud enabled: ${fbOn ? '<span class="ok">yes</span>' : '<span class="warn">no</span>'}`,
         `Cloud connected: ${CloudDB.ready ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
         `Language: ${escapeHtml(I18n.lang)}`,
+        `Lebanon TZ: ${escapeHtml(LB_TZ)}`,
       ];
       el_.innerHTML = lines.join("\n");
     };
