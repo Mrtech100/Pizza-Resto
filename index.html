@@ -1417,12 +1417,9 @@ function nowIso(){ return new Date().toISOString(); }
 
 /* ══════════════════════════════════════════════════════════════════
    LEBANON CALENDAR HELPERS
-   Everything the POS shows and stores as a "day" is anchored to
-   Asia/Beirut, and every display uses the Lebanon format DD/MM/YYYY.
    ══════════════════════════════════════════════════════════════════ */
 const LB_TZ = "Asia/Beirut";
 
-/* Any ISO string / Date → Lebanon local "YYYY-MM-DD". */
 function lbDateStr(input){
   if (!input) return "";
   const d = (input instanceof Date) ? input : new Date(input);
@@ -1440,7 +1437,6 @@ function lbDateStr(input){
   }
 }
 
-/* Any ISO string / Date → Lebanon local "HH:MM" (24 h). */
 function lbTimeStr(input){
   if (!input) return "";
   const d = (input instanceof Date) ? input : new Date(input);
@@ -1454,7 +1450,6 @@ function lbTimeStr(input){
   }
 }
 
-/* "YYYY-MM-DD" (internal) → "DD/MM/YYYY" (Lebanon display). */
 function lbDisplayDate(dateStr){
   if (!dateStr) return "";
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr));
@@ -1462,7 +1457,6 @@ function lbDisplayDate(dateStr){
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
-/* Any ISO string / Date → "DD/MM/YYYY HH:MM" (Lebanon display). */
 function lbDisplayDateTime(input){
   if (!input) return "";
   const d = new Date(input);
@@ -1470,7 +1464,6 @@ function lbDisplayDateTime(input){
   return lbDisplayDate(lbDateStr(d)) + " " + lbTimeStr(d);
 }
 
-/* Today's date in Lebanon, formatted as "YYYY-MM-DD" (internal storage). */
 function todayStr(){
   return lbDateStr(new Date());
 }
@@ -1495,7 +1488,6 @@ function withTimeout(promise, ms){
 }
 function sleep(ms){ return new Promise(r => setTimeout(r, Math.max(0, ms|0))); }
 
-/* "2025-01-15" → "Wed 15/01/2025" (Lebanon display). */
 function fmtDateLong(dateStr){
   if (!dateStr) return "";
   const d = new Date(dateStr + "T12:00:00");
@@ -1509,7 +1501,6 @@ function fmtDateLong(dateStr){
   }catch(e){ return disp; }
 }
 
-/* Whole-day distance between two YYYY-MM-DD strings (always ≥ 0). */
 function diffDays(fromStr, toStr){
   if (!fromStr || !toStr) return 0;
   const a = new Date(fromStr + "T00:00:00");
@@ -2374,7 +2365,6 @@ const DB = {
   },
 
   nextOrderNo(){
-    /* Order numbers are per Lebanon local day (YYYYMMDD). */
     const day = todayStr().replace(/-/g, "");
     const pref = `ORD-${day}-`;
     const startIso = this.settings.day_start_iso || "";
@@ -2387,7 +2377,6 @@ const DB = {
     return pref + String(n+1).padStart(4,"0");
   },
   resetDayCounter(){
-    /* Still stamped so the next order after Close Cash is #0001. */
     this.settings.day_start_iso = nowIso();
     this.save("settings");
     Persist.putObject("settings", this.settings);
@@ -2576,11 +2565,6 @@ const DB = {
     Persist.remove("expenses", id);
   },
 
-  /* ──────────────────────────────────────────────────────────────
-     REPORT FILTERS — anchored to Lebanon local days.
-     The old `day_start_iso` cut has been removed so no order is
-     ever hidden; the counter reset still works via nextOrderNo().
-     ────────────────────────────────────────────────────────────── */
   _paidOrdersInRange(s, e){
     return this.orders.filter(o => {
       if (o.status !== "paid") return false;
@@ -3029,7 +3013,6 @@ function buildReceiptText(order, settings, copyLabel=""){
     lines.push(center("*** " + copyLabel + " ***"));
     lines.push(sep("-"));
   }
-  /* Lebanon local date + time */
   const when = lbDisplayDate(todayStr()) + " " + lbTimeStr(new Date());
   lines.push(lr("Order: " + order.no, when));
   if (order.customer_name) lines.push("Customer: " + order.customer_name);
@@ -3160,7 +3143,6 @@ function buildCloseCashText(start, end, settings){
   if (settings.phone)   lines.push(center(settings.phone));
   lines.push(center("CLOSE CASH REPORT"));
   lines.push(sep("="));
-  /* Lebanon display: DD/MM/YYYY */
   const rangeLabel = lbDisplayDate(start) +
     (end !== start ? "  ->  " + lbDisplayDate(end) : "");
   lines.push(center(rangeLabel));
@@ -5930,37 +5912,62 @@ const ExpensesPage = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   REPORTS PAGE  —  simple single-day view (Lebanon calendar)
-   • "Today" button, "Yesterday" button
-   • Prev / Next day arrows
-   • Custom date picker (any date, up to today)
-   • Close Cash prints the day AND resets the order-number counter
-     — but does NOT hide historical orders from reports.
+   REPORTS PAGE  —  single-day view  OR  date-range view (Lebanon calendar)
+   • Day mode   : Today / Yesterday / Prev / Next / any date
+   • Range mode : From → To, plus quick presets (7d, 30d, this/last month)
+   • Close Cash prints the selected period. In DAY mode it also resets the
+     order-number counter — historical orders always stay visible in reports.
    ═══════════════════════════════════════════════════════════════════════════ */
 const ReportsPage = {
-  date: null,
+  date: null,                       // day mode
+  from: null,                       // range mode
+  to: null,                         // range mode
+  mode: "day",                      // "day" | "range"
   initialized: false,
   _prefsKey: "reports_view_day",
+  _rangePrefsKey: "reports_view_range",
 
   _loadPrefs(){
-    const d = STORE.get(this._prefsKey, null);
     const okDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
-    if (!okDate(d)) return false;
-    this.date = d;
+
+    const d = STORE.get(this._prefsKey, null);
+    this.date = okDate(d) ? d : todayStr();
+
+    const r = STORE.get(this._rangePrefsKey, null);
+    if (r && typeof r === "object"){
+      if (okDate(r.from)) this.from = r.from;
+      if (okDate(r.to))   this.to   = r.to;
+      if (r.mode === "range" || r.mode === "day") this.mode = r.mode;
+    }
+    if (!okDate(this.from)) this.from = firstOfMonthStr(todayStr());
+    if (!okDate(this.to))   this.to   = todayStr();
+    if (this.from > this.to){ const tmp = this.from; this.from = this.to; this.to = tmp; }
     return true;
   },
   _savePrefs(){
-    try { STORE.set(this._prefsKey, this.date); } catch (e) {}
+    try{
+      STORE.set(this._prefsKey, this.date);
+      STORE.set(this._rangePrefsKey, { mode:this.mode, from:this.from, to:this.to });
+    }catch(e){}
   },
   _refresh(){
     this._savePrefs();
     this.render();
   },
+  /* Returns the inclusive { s, e } ISO day range currently selected. */
+  _bounds(){
+    let s = (this.mode === "range") ? this.from : this.date;
+    let e = (this.mode === "range") ? this.to   : this.date;
+    if (!s) s = todayStr();
+    if (!e) e = todayStr();
+    if (s > e){ const tmp = s; s = e; e = tmp; }
+    return { s, e };
+  },
 
   init(){
     if (this.initialized) return;
     this.initialized = true;
-    if (!this._loadPrefs()) this.date = todayStr();
+    this._loadPrefs();
 
     const el = document.getElementById("page-reports");
     if (!el){ console.error("[ReportsPage] #page-reports not found"); return; }
@@ -5970,12 +5977,30 @@ const ReportsPage = {
 
       <div class="card" style="padding:12px; margin-bottom:12px;">
         <div class="report-controls" style="margin-bottom:0; flex-wrap:wrap;">
-          <button class="btn chip" id="rep-today">${escapeHtml(t("today"))}</button>
-          <button class="btn chip" id="rep-yesterday">${escapeHtml(t("rep_yesterday"))}</button>
+          <div class="seg" id="rep-mode-seg">
+            <button data-mode="day">${escapeHtml(t("rep_mode_day"))}</button>
+            <button data-mode="range">${escapeHtml(t("rep_mode_range"))}</button>
+          </div>
           <div style="flex:1; min-width:12px;"></div>
-          <button class="btn icon" id="rep-prev" title="${escapeHtml(t("rep_prev_day"))}">◀</button>
-          <input type="date" id="rep-date" style="max-width:190px;">
-          <button class="btn icon" id="rep-next" title="${escapeHtml(t("rep_next_day"))}">▶</button>
+
+          <div id="rep-day-nav" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <button class="btn chip" id="rep-today">${escapeHtml(t("today"))}</button>
+            <button class="btn chip" id="rep-yesterday">${escapeHtml(t("rep_yesterday"))}</button>
+            <button class="btn icon" id="rep-prev" title="${escapeHtml(t("rep_prev_day"))}">◀</button>
+            <input type="date" id="rep-date" style="max-width:190px;">
+            <button class="btn icon" id="rep-next" title="${escapeHtml(t("rep_next_day"))}">▶</button>
+          </div>
+
+          <div id="rep-range-nav" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;">
+            <button class="btn chip" id="rep-last7">${escapeHtml(t("rep_last7"))}</button>
+            <button class="btn chip" id="rep-last30">${escapeHtml(t("rep_last30"))}</button>
+            <button class="btn chip" id="rep-this-month">${escapeHtml(t("rep_this_month"))}</button>
+            <button class="btn chip" id="rep-last-month">${escapeHtml(t("rep_last_month"))}</button>
+            <span class="muted" style="font-size:11px;">${escapeHtml(t("from"))}</span>
+            <input type="date" id="rep-from" style="max-width:170px;">
+            <span class="muted" style="font-size:11px;">${escapeHtml(t("to"))}</span>
+            <input type="date" id="rep-to" style="max-width:170px;">
+          </div>
         </div>
         <div class="muted" id="rep-date-lbl"
              style="margin-top:10px; font-weight:700; font-size:12px;"></div>
@@ -6048,8 +6073,33 @@ const ReportsPage = {
       </div>`;
 
     const $ = id => document.getElementById(id);
+    const dateInput  = $("rep-date");
+    const fromInput  = $("rep-from");
+    const toInput    = $("rep-to");
+    const seg        = $("rep-mode-seg");
 
-    const dateInput = $("rep-date");
+    /* ── mode switch: Day  ↔  Range ─────────────────────────────────────── */
+    if (seg){
+      seg.querySelectorAll("button").forEach(b => {
+        b.addEventListener("click", () => {
+          const m = b.dataset.mode;
+          if (m === this.mode) return;
+          this.mode = m;
+          if (m === "range"){
+            if (!this.from || !this.to){
+              this.from = firstOfMonthStr(this.date || todayStr());
+              this.to   = this.date || todayStr();
+            }
+            if (this.from > this.to){
+              const tmp = this.from; this.from = this.to; this.to = tmp;
+            }
+          }
+          this._refresh();
+        });
+      });
+    }
+
+    /* ── day-mode navigation ────────────────────────────────────────────── */
     if (dateInput){
       dateInput.addEventListener("change", e => {
         if (!e.target.value) return;
@@ -6067,24 +6117,59 @@ const ReportsPage = {
       this._refresh();
     });
 
+    /* ── range-mode presets + inputs ────────────────────────────────────── */
+    const setRange = (f, tt) => {
+      this.from = f; this.to = tt;
+      if (this.from > this.to){ const tmp = this.from; this.from = this.to; this.to = tmp; }
+      this._refresh();
+    };
+    if ($("rep-last7"))      $("rep-last7").addEventListener("click",  () => setRange(addDaysStr(todayStr(), -6), todayStr()));
+    if ($("rep-last30"))     $("rep-last30").addEventListener("click", () => setRange(addDaysStr(todayStr(), -29), todayStr()));
+    if ($("rep-this-month")) $("rep-this-month").addEventListener("click", () => setRange(firstOfMonthStr(todayStr()), todayStr()));
+    if ($("rep-last-month")) $("rep-last-month").addEventListener("click", () => {
+      const firstThis = firstOfMonthStr(todayStr());
+      const lastPrev  = addDaysStr(firstThis, -1);
+      setRange(firstOfMonthStr(lastPrev), lastPrev);
+    });
+    if (fromInput) fromInput.addEventListener("change", e => {
+      if (!e.target.value) return;
+      this.from = e.target.value;
+      if (this.from > todayStr()) this.from = todayStr();
+      if (this.from > this.to)    this.to   = this.from;
+      this._refresh();
+    });
+    if (toInput) toInput.addEventListener("change", e => {
+      if (!e.target.value) return;
+      this.to = e.target.value;
+      if (this.to > todayStr())   this.to   = todayStr();
+      if (this.to < this.from)    this.from = this.to;
+      this._refresh();
+    });
+
+    /* ── Close Cash ─────────────────────────────────────────────────────── */
     if ($("rep-print-cc")) $("rep-print-cc").addEventListener("click", async () => {
       const btn = $("rep-print-cc");
       if (!btn || btn.disabled) return;
       btn.disabled = true;
       try {
-        const text = buildCloseCashText(this.date, this.date, DB.settings);
+        const { s: cs, e: ce } = this._bounds();
+        const text = buildCloseCashText(cs, ce, DB.settings);
         const res = await Printer.printText(text, DB.settings);
         if (!res || res.ok === false){
           toast(t("printing_fail"), "error", 5000);
           return;
         }
-        /* Day closed → reset the day counter so the next order is #0001.
-           Historical orders stay visible in reports. */
-        DB.resetDayCounter();
-        this.date = todayStr();
-        this._refresh();
-        try { POSPage.renderTabs(); POSPage.updateCartFab(); } catch(e){}
-        toast(t("day_closed"), "success", 6500);
+        if (cs === ce){
+          /* Day closed → reset the day counter so the next order is #0001.
+             Historical orders stay visible in reports. */
+          DB.resetDayCounter();
+          this.date = todayStr();
+          this._refresh();
+          try { POSPage.renderTabs(); POSPage.updateCartFab(); } catch(e){}
+          toast(t("day_closed"), "success", 6500);
+        } else {
+          toast(t("printing_ok"), "success");
+        }
       } finally {
         btn.disabled = false;
       }
@@ -6095,7 +6180,8 @@ const ReportsPage = {
         toast(t("cloud_sync_first"), "warning");
         return;
       }
-      const res = await CloudSync.pushCloseCash(this.date, this.date);
+      const { s: cs, e: ce } = this._bounds();
+      const res = await CloudSync.pushCloseCash(cs, ce);
       if (res.ok) toast(t("close_cash_synced"), "success");
       else toast(t("firebase_sync_failed") + res.info, "error", 5000);
     });
@@ -6113,27 +6199,48 @@ const ReportsPage = {
 
   render(){
     const $ = id => document.getElementById(id);
-    const d = this.date || todayStr();
     const today = todayStr();
+    const { s, e } = this._bounds();
+
+    /* mode segmented control + which nav row is visible */
+    const seg = $("rep-mode-seg");
+    if (seg){
+      seg.querySelectorAll("button").forEach(b =>
+        b.classList.toggle("on", b.dataset.mode === this.mode));
+    }
+    const dayNav   = $("rep-day-nav");
+    const rangeNav = $("rep-range-nav");
+    if (dayNav)   dayNav.style.display   = (this.mode === "range") ? "none" : "flex";
+    if (rangeNav) rangeNav.style.display = (this.mode === "range") ? "flex" : "none";
 
     const dateInput = $("rep-date");
     if (dateInput){
-      dateInput.value = d;
-      dateInput.max = today;
+      dateInput.value = this.date || today;
+      dateInput.max   = today;
     }
+    const fromInput = $("rep-from");
+    if (fromInput){ fromInput.value = s; fromInput.max = today; }
+    const toInput = $("rep-to");
+    if (toInput){ toInput.value = e; toInput.max = today; }
+
     const lbl = $("rep-date-lbl");
     if (lbl){
-      const suffix = (d === today) ? "  •  " + t("today") : "";
-      /* Show both the internal ISO and the Lebanon format for clarity. */
-      lbl.textContent = t("rep_showing_day", { date: fmtDateLong(d) }) + suffix +
-        "   (" + lbDisplayDate(d) + ")";
+      if (this.mode === "range"){
+        const n = diffDays(s, e) + 1;
+        lbl.textContent = t("rep_showing_range", {
+          from: fmtDateLong(s), to: fmtDateLong(e), n,
+        }) + "   (" + lbDisplayDate(s) + " → " + lbDisplayDate(e) + ")";
+      } else {
+        const suffix = (s === today) ? "  •  " + t("today") : "";
+        lbl.textContent = t("rep_showing_day", { date: fmtDateLong(s) }) + suffix +
+          "   (" + lbDisplayDate(s) + ")";
+      }
     }
     const nextBtn = $("rep-next");
-    if (nextBtn) nextBtn.disabled = (d >= today);
+    if (nextBtn) nextBtn.disabled = ((this.date || today) >= today);
     const prevBtn = $("rep-prev");
     if (prevBtn) prevBtn.disabled = false;
 
-    const s = d, e = d;
     const settings = DB.settings;
     const sym = settings.currency_symbol;
     const summ = DB.summary(s, e);
@@ -6182,10 +6289,11 @@ const ReportsPage = {
         ordersEl.innerHTML = orders.map(o => {
           const num = String(o.order_no || "").split("-").pop();
           const when = lbTimeStr(o.created_at);
+          const dayTxt = (s === e) ? "" : lbDisplayDate(lbDateStr(o.created_at)) + " ";
           return `<div class="order-item" data-id="${o.id}">
             <div class="ono">#${escapeHtml(num)}</div>
             <div class="ocust">${escapeHtml(o.customer_name || "—")}</div>
-            <div class="otime">${escapeHtml(when)}</div>
+            <div class="otime">${escapeHtml(dayTxt + when)}</div>
             <div class="ototal">${fmtMoney(o.total, sym)}</div>
             <div class="oact">
               <button class="btn icon" data-act="receipt" title="${escapeHtml(t("view_receipt"))}">🧾</button>
