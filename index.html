@@ -1393,6 +1393,106 @@ const STORE = {
   },
 };
 
+/* ═══════════════════ OFFLINE OUTBOX (NEW) ═══════════════════
+   Every write that fails or happens while offline goes here.
+   Persisted in localStorage so it survives reloads, and drained
+   automatically the moment Firestore reconnects.                        */
+const Outbox = {
+  KEY: "pos_outbox",
+  _items: [],
+  _flushing: false,
+
+  load(){
+    try { this._items = STORE.get(this.KEY, []) || []; }
+    catch (e) { this._items = []; }
+    return this._items;
+  },
+  save(){
+    try { STORE.set(this.KEY, this._items); } catch (e) {}
+  },
+  count(){ return this._items.length; },
+
+  enqueue(coll, op, id, data){
+    const idStr = String(id);
+    // Consolidate stock adjustments into one increment
+    if (op === "adjust"){
+      const ex = this._items.find(x =>
+        x.coll === coll && x.id === idStr && x.op === "adjust");
+      if (ex){
+        ex.data.delta += data.delta;
+        ex.ts = Date.now();
+        this.save(); this._notify(); return;
+      }
+    }
+    // For put/remove, drop any earlier put/remove for the same id
+    if (op === "put" || op === "remove"){
+      this._items = this._items.filter(x =>
+        !(x.coll === coll && x.id === idStr &&
+          (x.op === "put" || x.op === "remove")));
+    }
+    this._items.push({ coll, op, id: idStr, data, ts: Date.now() });
+    this.save();
+    this._notify();
+  },
+
+  pendingIds(coll){
+    const s = new Set();
+    for (const it of this._items){
+      if (it.coll === coll) s.add(String(it.id));
+    }
+    return s;
+  },
+
+  _notify(){
+    try {
+      if (CloudDB.ready && this._items.length){
+        SyncStatus.set("syncing", `Sync pending (${this._items.length})`);
+      } else if (CloudDB.ready && !this._items.length && SyncStatus.state === "syncing"){
+        SyncStatus.set("synced", "All synced");
+      }
+    } catch (e) {}
+  },
+
+  async flush(){
+    if (this._flushing) return;
+    if (!CloudDB.ready) return;
+    if (!this._items.length) return;
+    this._flushing = true;
+    try {
+      const snapshot = this._items.slice();
+      for (const item of snapshot){
+        try {
+          await this._apply(item);
+          this._items = this._items.filter(x => x !== item);
+          this.save();
+          this._notify();
+        } catch (e){
+          console.warn("[Outbox] flush item failed:", item, e);
+          break;
+        }
+      }
+    } finally {
+      this._flushing = false;
+      this._notify();
+    }
+  },
+
+  async _apply(item){
+    const ref = CloudDB.col(item.coll).doc(String(item.id));
+    if (item.op === "put"){
+      await ref.set(sanitize(item.data));
+    } else if (item.op === "remove"){
+      await ref.delete();
+    } else if (item.op === "adjust"){
+      await ref.set(
+        { stock: firebase.firestore.FieldValue.increment(item.data.delta) },
+        { merge: true }
+      );
+    }
+  },
+};
+Outbox.load();
+
 /* ═══════════════════ HELPERS ═══════════════════ */
 function escapeHtml(s){
   return String(s == null ? "" : s)
@@ -1831,7 +1931,7 @@ const CloudDB = {
   },
 };
 
-/* ═══════════════════ PERSISTENCE ═══════════════════ */
+/* ═══════════════════ PERSISTENCE (OUTBOX-AWARE) ═══════════════════ */
 const Persist = {
   _chain: Promise.resolve(),
   _queue(fn){
@@ -1844,28 +1944,59 @@ const Persist = {
   },
   cache(coll){ try{ STORE.set(coll, DB[coll]); }catch(e){} },
   _docId(coll, rec){ return COLLECTIONS[coll].single ? "main" : String(rec.id); },
+
   put(coll, rec){
     this.cache(coll);
-    if (!rec || !CloudDB.ready) return;
+    if (!rec) return;
     const id = this._docId(coll, rec);
     const data = sanitize(rec);
-    this._queue(()=> CloudDB.col(coll).doc(id).set(data));
+
+    if (!CloudDB.ready){
+      Outbox.enqueue(coll, "put", id, data);
+      return;
+    }
+    this._queue(() =>
+      CloudDB.col(coll).doc(id).set(data).catch(e => {
+        console.warn("[Persist.put] queue to outbox:", e);
+        Outbox.enqueue(coll, "put", id, data);
+        throw e;
+      })
+    );
   },
+
   putObject(coll, obj){
     this.cache(coll);
-    if (!CloudDB.ready) return;
     let data = sanitize(obj || {});
     if (coll === "settings"){
       data = Object.assign({}, data);
       for (const k of DEVICE_LOCAL_SETTING_KEYS) delete data[k];
     }
-    this._queue(()=> CloudDB.col(coll).doc("main").set(data));
+    if (!CloudDB.ready){
+      Outbox.enqueue(coll, "put", "main", data);
+      return;
+    }
+    this._queue(() =>
+      CloudDB.col(coll).doc("main").set(data).catch(e => {
+        Outbox.enqueue(coll, "put", "main", data);
+        throw e;
+      })
+    );
   },
+
   remove(coll, id){
     this.cache(coll);
-    if (!CloudDB.ready) return;
-    this._queue(()=> CloudDB.col(coll).doc(String(id)).delete());
+    if (!CloudDB.ready){
+      Outbox.enqueue(coll, "remove", String(id));
+      return;
+    }
+    this._queue(() =>
+      CloudDB.col(coll).doc(String(id)).delete().catch(e => {
+        Outbox.enqueue(coll, "remove", String(id));
+        throw e;
+      })
+    );
   },
+
   putAll(coll){
     this.cache(coll);
     if (!CloudDB.ready) return;
@@ -1883,12 +2014,21 @@ const Persist = {
       if (n) await batch.commit();
     });
   },
+
   adjustStock(productId, delta){
     this.cache("products");
-    if (!CloudDB.ready) return;
-    this._queue(()=> CloudDB.col("products")
-      .doc(String(productId))
-      .set({ stock: firebase.firestore.FieldValue.increment(delta) }, { merge:true }));
+    if (!CloudDB.ready){
+      Outbox.enqueue("products", "adjust", String(productId), { delta });
+      return;
+    }
+    this._queue(() =>
+      CloudDB.col("products").doc(String(productId))
+        .set({ stock: firebase.firestore.FieldValue.increment(delta) }, { merge: true })
+        .catch(e => {
+          Outbox.enqueue("products", "adjust", String(productId), { delta });
+          throw e;
+        })
+    );
   },
 };
 
@@ -1913,7 +2053,10 @@ const SyncStatus = {
   },
 };
 
-/* ═══════════════════ REALTIME ═══════════════════ */
+/* ═══════════════════ REALTIME (MERGE-AWARE) ═══════════════════
+   When reconnecting, we don't blindly overwrite DB[coll] with the
+   cloud snapshot — records that have pending outbox writes keep
+   their local state until they are flushed.                              */
 const Realtime = {
   unsubs: [], started: false,
   start(){
@@ -1932,6 +2075,8 @@ const Realtime = {
       this.unsubs.push(unsub);
     }
     SyncStatus.set("synced", "Shared database connected");
+    // Drain any pending offline writes as soon as snapshots come alive
+    if (Outbox.count() > 0) Outbox.flush();
   },
   stop(){
     for (const u of this.unsubs){ try{ u(); }catch(e){} }
@@ -1944,23 +2089,54 @@ const Realtime = {
   },
   apply(coll, snap){
     const single = COLLECTIONS[coll].single;
+    const pending = Outbox.pendingIds(coll);
     let value;
+
     if (single){
       value = {};
       snap.docs.forEach(d => { if (d.id === "main") value = d.data() || {}; });
+      // If settings has pending local changes, keep them
+      if (pending.has("main")){
+        value = Object.assign({}, value, DB[coll] || {});
+      }
     } else {
-      value = snap.docs.map(d => {
+      // Cloud map
+      const cloudMap = new Map();
+      snap.docs.forEach(d => {
         const data = d.data() || {};
         const n = Number(data.id);
-        return Object.assign({}, data, { id: Number.isFinite(n) ? n : data.id });
+        const id = Number.isFinite(n) ? n : data.id;
+        cloudMap.set(String(id), Object.assign({}, data, { id }));
       });
+
+      // Local map
+      const localMap = new Map();
+      (DB[coll] || []).forEach(r => localMap.set(String(r.id), r));
+
+      value = [];
+      for (const [id, cloudRec] of cloudMap){
+        if (pending.has(id)){
+          // Local has pending change — local wins until flushed
+          if (localMap.has(id)) value.push(localMap.get(id));
+          // else local deleted it — don't resurrect from cloud
+        } else {
+          value.push(cloudRec);
+        }
+      }
+      // Add offline-created records that are still pending
+      for (const [id, localRec] of localMap){
+        if (pending.has(id) && !cloudMap.has(id)) value.push(localRec);
+      }
     }
+
+    // Preserve device-local settings
     if (coll === "settings"){
       for (const k of DEVICE_LOCAL_SETTING_KEYS){
         if (DB.settings && DB.settings[k] !== undefined) value[k] = DB.settings[k];
         else if (DEFAULT_SETTINGS[k] !== undefined)      value[k] = DEFAULT_SETTINGS[k];
       }
     }
+
     const before = JSON.stringify(DB[coll] || (single ? {} : []));
     const after  = JSON.stringify(value);
     DB[coll] = value;
@@ -2033,6 +2209,9 @@ const DB = {
     if (useCloud && cloudReachable){
       Realtime.start();
       SyncStatus.set("synced", "Shared database connected · device " + (CloudDB.uid || "").slice(0,6));
+    } else {
+      // If we're offline but the user is already seeded, stay silent
+      if (Outbox.count() > 0) SyncStatus.set("local", `Offline · ${Outbox.count()} change(s) queued`);
     }
     status("");
   },
@@ -5913,16 +6092,12 @@ const ExpensesPage = {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    REPORTS PAGE  —  single-day view  OR  date-range view (Lebanon calendar)
-   • Day mode   : Today / Yesterday / Prev / Next / any date
-   • Range mode : From → To, plus quick presets (7d, 30d, this/last month)
-   • Close Cash prints the selected period. In DAY mode it also resets the
-     order-number counter — historical orders always stay visible in reports.
    ═══════════════════════════════════════════════════════════════════════════ */
 const ReportsPage = {
-  date: null,                       // day mode
-  from: null,                       // range mode
-  to: null,                         // range mode
-  mode: "day",                      // "day" | "range"
+  date: null,
+  from: null,
+  to: null,
+  mode: "day",
   initialized: false,
   _prefsKey: "reports_view_day",
   _rangePrefsKey: "reports_view_range",
@@ -5954,7 +6129,6 @@ const ReportsPage = {
     this._savePrefs();
     this.render();
   },
-  /* Returns the inclusive { s, e } ISO day range currently selected. */
   _bounds(){
     let s = (this.mode === "range") ? this.from : this.date;
     let e = (this.mode === "range") ? this.to   : this.date;
@@ -6078,7 +6252,6 @@ const ReportsPage = {
     const toInput    = $("rep-to");
     const seg        = $("rep-mode-seg");
 
-    /* ── mode switch: Day  ↔  Range ─────────────────────────────────────── */
     if (seg){
       seg.querySelectorAll("button").forEach(b => {
         b.addEventListener("click", () => {
@@ -6099,7 +6272,6 @@ const ReportsPage = {
       });
     }
 
-    /* ── day-mode navigation ────────────────────────────────────────────── */
     if (dateInput){
       dateInput.addEventListener("change", e => {
         if (!e.target.value) return;
@@ -6117,7 +6289,6 @@ const ReportsPage = {
       this._refresh();
     });
 
-    /* ── range-mode presets + inputs ────────────────────────────────────── */
     const setRange = (f, tt) => {
       this.from = f; this.to = tt;
       if (this.from > this.to){ const tmp = this.from; this.from = this.to; this.to = tmp; }
@@ -6146,7 +6317,6 @@ const ReportsPage = {
       this._refresh();
     });
 
-    /* ── Close Cash ─────────────────────────────────────────────────────── */
     if ($("rep-print-cc")) $("rep-print-cc").addEventListener("click", async () => {
       const btn = $("rep-print-cc");
       if (!btn || btn.disabled) return;
@@ -6160,8 +6330,6 @@ const ReportsPage = {
           return;
         }
         if (cs === ce){
-          /* Day closed → reset the day counter so the next order is #0001.
-             Historical orders stay visible in reports. */
           DB.resetDayCounter();
           this.date = todayStr();
           this._refresh();
@@ -6202,7 +6370,6 @@ const ReportsPage = {
     const today = todayStr();
     const { s, e } = this._bounds();
 
-    /* mode segmented control + which nav row is visible */
     const seg = $("rep-mode-seg");
     if (seg){
       seg.querySelectorAll("button").forEach(b =>
@@ -6672,6 +6839,7 @@ const SettingsPage = {
         `Connection: ${CloudDB.ready ? '<span class="ok">connected</span>' : '<span class="bad">not connected</span>'}`,
         `Last error: ${CloudDB.error ? '<span class="bad">' + escapeHtml(CloudDB.error) + '</span>' : '<span class="ok">none</span>'}`,
         `Browser online: ${online ? '<span class="ok">yes</span>' : '<span class="bad">no</span>'}`,
+        `Outbox pending: ${Outbox.count()} change(s)`,
         `Records: products ${DB.products.length} · customers ${DB.customers.length} · orders ${DB.orders.length} · lines ${DB.order_items.length} · expenses ${DB.expenses.length}`,
       ].join("\n");
     };
@@ -6866,6 +7034,7 @@ const SettingsPage = {
         if (CloudDB.ready){
           try{ await DB._fetchCloud(); }catch(e){}
           Realtime.start();
+          Outbox.flush();
         }
       }
       if (S.firebase_enabled === "0"){ Realtime.stop(); }
@@ -6882,6 +7051,7 @@ const SettingsPage = {
       if (ok){
         try{ await DB._fetchCloud(); }catch(e){}
         Realtime.restart();
+        Outbox.flush();
         SyncStatus.set("synced", "Reconnected manually");
         toast("Cloud reconnected", "success");
       } else {
@@ -7254,11 +7424,11 @@ const PWA = {
     if (!("serviceWorker" in navigator)) return;
     if (!isSecureContext_()) return;
     try{
-      const probe = await fetch("sw.js", { method:"HEAD" }).catch(()=> null);
-      if (!probe || !probe.ok) return;
       await navigator.serviceWorker.register("sw.js", { scope: "./" });
       this._swRegistered = true;
-    }catch(e){}
+    }catch(e){
+      console.warn("[PWA] SW registration failed:", e);
+    }
   },
   bindInstallButton(){
     const btn = document.getElementById("install-btn");
@@ -7345,10 +7515,19 @@ function isStandalone(){ return PWA.isStandalone(); }
 /* ═══════════════════ APP ═══════════════════ */
 const App = {
   user: null, page: "pos",
-  _pagesInited: false, _syncTimer: null, _pollTimer: null,
+  _pagesInited: false, _syncTimer: null, _pollTimer: null, _outboxTimer: null,
 
   async init(){
     PWA.setup();
+
+    // Ask the browser to persist our localStorage — protects offline data
+    // from eviction under storage pressure.
+    if (navigator.storage && navigator.storage.persist){
+      navigator.storage.persist().then(granted => {
+        console.log("[Storage] Persistent:", granted ? "granted ✓" : "denied");
+      }).catch(()=>{});
+    }
+
     const status = document.getElementById("login-cloud");
     await DB.load(msg => { if (status) status.textContent = msg ? "☁ " + msg : ""; });
 
@@ -7380,10 +7559,33 @@ const App = {
     }
 
     PrintListener.start();
+
+    // Poll the print queue for missed jobs (store devices)
     if (this._pollTimer) clearInterval(this._pollTimer);
     this._pollTimer = setInterval(()=>{
       if (PrintListener.isEnabled()) PrintListener.poll();
     }, 20000);
+
+    // Drain the outbox periodically — belt and braces if an `online` event
+    // or the realtime snapshot listener was missed.
+    if (this._outboxTimer) clearInterval(this._outboxTimer);
+    this._outboxTimer = setInterval(()=>{
+      if (CloudDB.ready && Outbox.count() > 0) Outbox.flush();
+    }, 15000);
+
+    // Update the sync pill with pending count
+    this._refreshOutboxPill();
+    setInterval(()=>this._refreshOutboxPill(), 2000);
+  },
+
+  _refreshOutboxPill(){
+    if (!CloudDB.ready) return;
+    const n = Outbox.count();
+    if (n > 0 && SyncStatus.state !== "syncing"){
+      SyncStatus.set("syncing", `Sync pending (${n})`);
+    } else if (n === 0 && SyncStatus.state === "syncing"){
+      SyncStatus.set("synced", "All synced");
+    }
   },
 
   bindLogin(){
@@ -7415,20 +7617,21 @@ const App = {
     window.addEventListener("resize", refresh);
     window.addEventListener("orientationchange", ()=>setTimeout(refresh, 200));
 
-    window.addEventListener("online", ()=>{
+    window.addEventListener("online", async ()=>{
       SyncStatus.set(CloudDB.ready ? "synced" : "local",
         CloudDB.ready ? "Back online" : "Offline — local data only");
       if (DB.settings.firebase_enabled === "1" && !CloudDB.ready){
         CloudDB._initPromise = null;
-        CloudDB.init().then(ok=>{
-          if (ok){
-            try{ Realtime.start(); }catch(e){}
-            SyncStatus.set("synced", "Reconnected after offline");
-          }
-        });
+        const ok = await CloudDB.init().catch(()=>false);
+        if (ok){
+          try{ Realtime.start(); }catch(e){}
+          SyncStatus.set("synced", "Reconnected after offline");
+        }
       } else if (CloudDB.ready){
         Realtime.restart();
       }
+      // Push any writes made while offline
+      setTimeout(()=>Outbox.flush(), 500);
       if (PrintListener.isEnabled()) PrintListener.restart();
     });
     window.addEventListener("offline", ()=>{
@@ -7483,6 +7686,8 @@ const App = {
     this.nav("pos");
     PWA.refreshButton();
     if (PrintListener.isEnabled()) PrintListener.start();
+    // Drain any pending offline writes as soon as we open
+    if (CloudDB.ready && Outbox.count() > 0) Outbox.flush();
   },
 
   nav(page){
